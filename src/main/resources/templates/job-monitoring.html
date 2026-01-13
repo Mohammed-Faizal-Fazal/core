@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head :: common-head('Job Monitoring')"></head>
+<body class="bg-gray-50">
+<div th:replace="fragments/navigation :: navbar"></div>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-800">
+                <i class="bi bi-kanban"></i> Job Monitoring
+            </h2>
+            <p class="text-gray-600">Monitor all carpenter jobs and reassign failed jobs</p>
+        </div>
+
+        <!-- Refresh Button -->
+        <button onclick="loadAllJobs()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Total Jobs</p>
+                    <h3 class="text-3xl font-bold text-blue-600" id="totalJobs">0</h3>
+                </div>
+                <div class="bg-blue-100 rounded-full p-4">
+                    <i class="bi bi-list-task text-3xl text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Assigned</p>
+                    <h3 class="text-3xl font-bold text-orange-600" id="assignedJobs">0</h3>
+                </div>
+                <div class="bg-orange-100 rounded-full p-4">
+                    <i class="bi bi-clock text-3xl text-orange-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">In Progress</p>
+                    <h3 class="text-3xl font-bold text-purple-600" id="inProgressJobs">0</h3>
+                </div>
+                <div class="bg-purple-100 rounded-full p-4">
+                    <i class="bi bi-play-circle text-3xl text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Completed</p>
+                    <h3 class="text-3xl font-bold text-green-600" id="completedJobs">0</h3>
+                </div>
+                <div class="bg-green-100 rounded-full p-4">
+                    <i class="bi bi-check-circle text-3xl text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg transition" onclick="filterJobs('FAILED')">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Failed</p>
+                    <h3 class="text-3xl font-bold text-red-600" id="failedJobs">0</h3>
+                </div>
+                <div class="bg-red-100 rounded-full p-4">
+                    <i class="bi bi-x-circle text-3xl text-red-600"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+        <div class="flex space-x-4 flex-wrap gap-2">
+            <button id="filterAll" onclick="filterJobs('ALL')" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold">
+                <i class="bi bi-list"></i> All Jobs
+            </button>
+            <button id="filterAssigned" onclick="filterJobs('ASSIGNED')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                <i class="bi bi-clock"></i> Assigned
+            </button>
+            <button id="filterInProgress" onclick="filterJobs('IN_PROGRESS')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                <i class="bi bi-play-circle"></i> In Progress
+            </button>
+            <button id="filterCompleted" onclick="filterJobs('COMPLETED')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                <i class="bi bi-check-circle"></i> Completed
+            </button>
+            <button id="filterFailed" onclick="filterJobs('FAILED')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300">
+                <i class="bi bi-x-circle"></i> Failed
+            </button>
+        </div>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full" id="jobsTable">
+                <thead class="gradient-bg text-white">
+                <tr>
+                    <th class="px-4 py-3 text-left">Order No</th>
+                    <th class="px-4 py-3 text-left">Customer</th>
+                    <th class="px-4 py-3 text-left">Carpenter</th>
+                    <th class="px-4 py-3 text-left">Assigned Date</th>
+                    <th class="px-4 py-3 text-left">Status</th>
+                    <th class="px-4 py-3 text-left">Last Updated</th>
+                    <th class="px-4 py-3 text-left">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="jobsTableBody" class="divide-y divide-gray-200">
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        <i class="bi bi-hourglass-split text-3xl"></i>
+                        <p class="mt-2">Loading jobs...</p>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Job Details Modal -->
+<div id="jobDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-800">
+                <i class="bi bi-info-circle"></i> Job Details & History
+            </h3>
+            <button onclick="closeJobDetailsModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+
+        <div id="jobDetailsContent" class="p-6">
+            <!-- Content loaded dynamically -->
+        </div>
+    </div>
+</div>
+
+<!-- Reassign Job Modal -->
+<div id="reassignModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-gray-800">
+                <i class="bi bi-arrow-repeat"></i> Reassign Job
+            </h3>
+            <button onclick="closeReassignModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="bi bi-x-lg text-2xl"></i>
+            </button>
+        </div>
+
+        <form id="reassignForm" class="p-6">
+            <input type="hidden" id="reassignJobId">
+
+            <!-- Current Assignment Info -->
+            <div class="mb-6 p-4 bg-red-50 rounded-lg border border-red-200">
+                <h4 class="font-semibold text-red-800 mb-2">Current Assignment</h4>
+                <p class="text-sm text-red-700">
+                    <strong>Carpenter:</strong> <span id="currentCarpenterName">-</span><br>
+                    <strong>Status:</strong> <span id="currentJobStatus">-</span><br>
+                    <strong>Reason:</strong> Job failed or needs reassignment
+                </p>
+            </div>
+
+            <!-- Select New Carpenter -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Select New Carpenter *
+                </label>
+                <select id="reassignCarpenterSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required onchange="onReassignCarpenterChange()">
+                    <option value="">Loading carpenters...</option>
+                </select>
+            </div>
+
+            <!-- Carpenter Pincode -->
+            <div id="reassignPincodeSection" class="mb-4 hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Start Location (Pincode) *
+                    <span class="text-xs text-gray-500 font-normal ml-2">
+                        <i class="bi bi-pencil"></i> Auto-filled, can override
+                    </span>
+                </label>
+                <input type="text" id="reassignPincode" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Enter pincode" pattern="[0-9]{6}" maxlength="6" required>
+            </div>
+
+            <!-- Assignment Date -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    New Assignment Date *
+                </label>
+                <input type="date" id="reassignDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
+            </div>
+
+            <!-- Routing Options -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Route Planning *
+                </label>
+                <div class="space-y-2">
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="routingOption" value="auto" checked class="mr-3">
+                        <div>
+                            <p class="font-semibold text-gray-800">
+                                <i class="bi bi-cpu"></i> Automatic Route Optimization
+                            </p>
+                            <p class="text-sm text-gray-600">System will optimize route with other orders assigned for this date</p>
+                        </div>
+                    </label>
+
+                    <label class="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="routingOption" value="manual" class="mr-3">
+                        <div>
+                            <p class="font-semibold text-gray-800">
+                                <i class="bi bi-hand-index"></i> Manual Assignment (No Route)
+                            </p>
+                            <p class="text-sm text-gray-600">Assign without automatic routing, carpenter manages their own route</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Reassignment Notes -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Reassignment Notes
+                </label>
+                <textarea id="reassignNotes" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Add reason for reassignment..."></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex space-x-4">
+                <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold">
+                    <i class="bi bi-check-circle"></i> Reassign Job
+                </button>
+                <button type="button" onclick="closeReassignModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition font-semibold">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const csrfToken = /*[[${_csrf.token}]]*/ 'default-token';
+    const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+    axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+    let allJobs = [];
+    let currentFilter = 'ALL';
+    let carpenters = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAllJobs();
+        loadCarpenters();
+        setMinDate();
+    });
+
+    function setMinDate() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('reassignDate').setAttribute('min', today);
+        document.getElementById('reassignDate').value = today;
+    }
+
+    async function loadAllJobs() {
+        try {
+            const response = await axios.get('/api/job-monitoring/all');
+            allJobs = response.data || [];
+            updateStatistics();
+            renderJobs();
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+            showMessage('Error loading jobs', 'error');
+        }
+    }
+
+    async function loadCarpenters() {
+        try {
+            const response = await axios.get('/api/carpenters/active');
+            carpenters = response.data;
+            populateCarpenterDropdown();
+        } catch (error) {
+            console.error('Error loading carpenters:', error);
+        }
+    }
+
+    function populateCarpenterDropdown() {
+        const select = document.getElementById('reassignCarpenterSelect');
+        select.innerHTML = '<option value="">Select Carpenter</option>';
+
+        carpenters.forEach(carpenter => {
+            const option = document.createElement('option');
+            option.value = carpenter.carpenterId;
+            option.textContent = `${carpenter.carpenterId} - ${carpenter.carpenterName}`;
+            option.dataset.pincode = carpenter.pincode || '';
+            select.appendChild(option);
+        });
+    }
+
+    function onReassignCarpenterChange() {
+        const select = document.getElementById('reassignCarpenterSelect');
+        const selectedOption = select.options[select.selectedIndex];
+        const pincodeSection = document.getElementById('reassignPincodeSection');
+        const pincodeInput = document.getElementById('reassignPincode');
+
+        if (select.value) {
+            pincodeSection.classList.remove('hidden');
+
+            const carpenterPincode = selectedOption.dataset.pincode;
+            if (carpenterPincode && carpenterPincode !== 'null' && carpenterPincode !== '') {
+                pincodeInput.value = carpenterPincode;
+                pincodeInput.style.borderColor = '#10b981';
+            } else {
+                pincodeInput.value = '';
+                pincodeInput.style.borderColor = '#d1d5db';
+            }
+        } else {
+            pincodeSection.classList.add('hidden');
+            pincodeInput.value = '';
+        }
+    }
+
+    function updateStatistics() {
+        document.getElementById('totalJobs').textContent = allJobs.length;
+        document.getElementById('assignedJobs').textContent = allJobs.filter(j => j.assignmentStatus === 'ASSIGNED').length;
+        document.getElementById('inProgressJobs').textContent = allJobs.filter(j => j.assignmentStatus === 'IN_PROGRESS').length;
+        document.getElementById('completedJobs').textContent = allJobs.filter(j => j.assignmentStatus === 'COMPLETED').length;
+        document.getElementById('failedJobs').textContent = allJobs.filter(j => j.assignmentStatus === 'FAILED').length;
+    }
+
+    function filterJobs(status) {
+        currentFilter = status;
+
+        // Update button styles
+        document.querySelectorAll('[id^="filter"]').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'bg-orange-600', 'bg-green-600', 'bg-red-600', 'bg-purple-600', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+
+        const filterMap = {
+            'ALL': 'filterAll',
+            'ASSIGNED': 'filterAssigned',
+            'IN_PROGRESS': 'filterInProgress',
+            'COMPLETED': 'filterCompleted',
+            'FAILED': 'filterFailed'
+        };
+
+        const activeBtn = document.getElementById(filterMap[status]);
+        if (activeBtn) {
+            activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            const colorMap = {
+                'ALL': 'bg-blue-600',
+                'ASSIGNED': 'bg-orange-600',
+                'IN_PROGRESS': 'bg-purple-600',
+                'COMPLETED': 'bg-green-600',
+                'FAILED': 'bg-red-600'
+            };
+            activeBtn.classList.add(colorMap[status], 'text-white');
+        }
+
+        renderJobs();
+    }
+
+    function renderJobs() {
+        const tbody = document.getElementById('jobsTableBody');
+
+        let filteredJobs = allJobs;
+        if (currentFilter !== 'ALL') {
+            filteredJobs = allJobs.filter(j => j.assignmentStatus === currentFilter);
+        }
+
+        if (filteredJobs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                        <i class="bi bi-inbox text-3xl"></i>
+                        <p class="mt-2">No jobs found for this filter</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = filteredJobs.map(job => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-bold text-green-600">${job.orderNo || 'N/A'}</td>
+                <td class="px-4 py-3">${job.customerName || 'N/A'}</td>
+                <td class="px-4 py-3">
+                    <div>
+                        <p class="font-semibold">${job.carpenterName || 'N/A'}</p>
+                        <p class="text-xs text-gray-500">${job.carpenterId || ''}</p>
+                    </div>
+                </td>
+                <td class="px-4 py-3">${formatDate(job.assignedDate)}</td>
+                <td class="px-4 py-3">
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(job.assignmentStatus)}">
+                        ${getStatusLabel(job.assignmentStatus)}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-sm">${formatDateTime(job.updatedAt)}</td>
+                <td class="px-4 py-3">
+                    <div class="flex space-x-2">
+                        <button onclick="viewJobDetails(${job.id})" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition text-sm">
+                            <i class="bi bi-eye"></i> View
+                        </button>
+                        ${job.assignmentStatus === 'FAILED' ? `
+                            <button onclick="openReassignModal(${job.id})" class="bg-orange-600 text-white px-3 py-1 rounded-lg hover:bg-orange-700 transition text-sm">
+                                <i class="bi bi-arrow-repeat"></i> Reassign
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function viewJobDetails(jobId) {
+        const job = allJobs.find(j => j.id === jobId);
+        if (!job) return;
+
+        const pincode = extractPincodeFromAddress(job.address);
+
+        const detailsHtml = `
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">Order Information</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                            <p><span class="font-medium">Order No:</span> ${job.orderNo || 'N/A'}</p>
+                            <p><span class="font-medium">Service:</span> ${job.serviceName || 'N/A'}</p>
+                            <p><span class="font-medium">Assigned Date:</span> ${formatDate(job.assignedDate)}</p>
+                            <p><span class="font-medium">Status:</span> <span class="px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(job.assignmentStatus)}">${getStatusLabel(job.assignmentStatus)}</span></p>
+                            <p><span class="font-medium">Last Updated:</span> ${formatDateTime(job.updatedAt)}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">Customer Information</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                            <p><span class="font-medium">Name:</span> ${job.customerName || 'N/A'}</p>
+                            <p><span class="font-medium">Phone:</span> <a href="tel:${job.customerMobile}" class="text-blue-600 hover:underline">${job.customerMobile || 'N/A'}</a></p>
+                            <p><span class="font-medium">Address:</span> ${job.address || 'N/A'}</p>
+                            <p><span class="font-medium">Pincode:</span> <span class="font-semibold text-blue-600">${pincode || 'N/A'}</span></p>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <h4 class="font-semibold text-gray-700 mb-2">Carpenter Assignment</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                            <p><span class="font-medium">Carpenter ID:</span> ${job.carpenterId || 'N/A'}</p>
+                            <p><span class="font-medium">Carpenter Name:</span> ${job.carpenterName || 'N/A'}</p>
+                            <p><span class="font-medium">Route Order:</span> ${job.routeOrder ? '#' + job.routeOrder : 'Not in route'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                ${job.notes ? `
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-2">Job Notes & History</h4>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <pre class="whitespace-pre-wrap text-sm">${job.notes}</pre>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="flex space-x-4">
+                    ${job.assignmentStatus === 'FAILED' ? `
+                        <button onclick="closeJobDetailsModal(); openReassignModal(${job.id})" class="flex-1 bg-orange-600 text-white py-3 rounded-lg hover:bg-orange-700 transition font-semibold">
+                            <i class="bi bi-arrow-repeat"></i> Reassign This Job
+                        </button>
+                    ` : ''}
+                    <button onclick="closeJobDetailsModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition font-semibold">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('jobDetailsContent').innerHTML = detailsHtml;
+        document.getElementById('jobDetailsModal').classList.remove('hidden');
+    }
+
+    function closeJobDetailsModal() {
+        document.getElementById('jobDetailsModal').classList.add('hidden');
+    }
+
+    function openReassignModal(jobId) {
+        const job = allJobs.find(j => j.id === jobId);
+        if (!job) return;
+
+        document.getElementById('reassignJobId').value = jobId;
+        document.getElementById('currentCarpenterName').textContent = job.carpenterName || 'N/A';
+        document.getElementById('currentJobStatus').textContent = getStatusLabel(job.assignmentStatus);
+        document.getElementById('reassignCarpenterSelect').value = '';
+        document.getElementById('reassignPincodeSection').classList.add('hidden');
+        document.getElementById('reassignNotes').value = '';
+
+        document.getElementById('reassignModal').classList.remove('hidden');
+    }
+
+    function closeReassignModal() {
+        document.getElementById('reassignModal').classList.add('hidden');
+        document.getElementById('reassignForm').reset();
+    }
+
+    document.getElementById('reassignForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const jobId = document.getElementById('reassignJobId').value;
+        const carpenterId = document.getElementById('reassignCarpenterSelect').value;
+        const pincode = document.getElementById('reassignPincode').value;
+        const assignedDate = document.getElementById('reassignDate').value;
+        const routingOption = document.querySelector('input[name="routingOption"]:checked').value;
+        const notes = document.getElementById('reassignNotes').value;
+
+        if (!carpenterId || !pincode || !assignedDate) {
+            alert('Please fill all required fields');
+            return;
+        }
+
+        if (!/^[0-9]{6}$/.test(pincode)) {
+            alert('Please enter a valid 6-digit pincode');
+            return;
+        }
+
+        try {
+            const response = await axios.post('/api/job-monitoring/reassign', {
+                jobId: parseInt(jobId),
+                carpenterId: carpenterId,
+                assignedDate: assignedDate,
+                startPincode: pincode,
+                routingOption: routingOption,
+                notes: notes
+            });
+
+            if (response.data.success) {
+                showMessage('Job reassigned successfully!', 'success');
+                closeReassignModal();
+                loadAllJobs();
+            } else {
+                showMessage(response.data.message, 'error');
+            }
+        } catch (error) {
+            console.error('Error reassigning job:', error);
+            showMessage('Error reassigning job: ' + (error.response?.data?.message || error.message), 'error');
+        }
+    });
+
+    function extractPincodeFromAddress(address) {
+        if (!address) return null;
+        const lastDashIndex = address.lastIndexOf('-');
+        if (lastDashIndex === -1) return null;
+        const afterDash = address.substring(lastDashIndex + 1).trim();
+        if (/^[0-9]{6}$/.test(afterDash)) {
+            return afterDash;
+        }
+        return null;
+    }
+
+    function getStatusLabel(status) {
+        const labels = {
+            'SUBMITTED': 'Submitted',
+            'ASSIGNED': 'Assigned',
+            'IN_PROGRESS': 'In Progress',
+            'COMPLETED': 'Completed',
+            'FAILED': 'Failed'
+        };
+        return labels[status] || status;
+    }
+
+    function getStatusBadgeClass(status) {
+        const classes = {
+            'SUBMITTED': 'bg-gray-100 text-gray-800',
+            'ASSIGNED': 'bg-orange-100 text-orange-800',
+            'IN_PROGRESS': 'bg-purple-100 text-purple-800',
+            'COMPLETED': 'bg-green-100 text-green-800',
+            'FAILED': 'bg-red-100 text-red-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+
+    function formatDateTime(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function showMessage(message, type = 'info') {
+        alert(message);
+    }
+    /*]]>*/
+</script>
+
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+<!-- Navigation Fragment -->
+<nav th:fragment="navbar" class="bg-gray-900 shadow-lg sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-3">
+            <!-- Logo -->
+            <a href="/home" class="flex items-center">
+                <img th:src="@{/images/logo.jpeg}" alt="INSTAFITCORE" class="h-12 rounded">
+            </a>
+
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex space-x-6">
+                <a href="/home" class="text-gray-300 hover:text-green-400 transition" th:classappend="${activePage == 'home'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-house-fill"></i> Home
+                </a>
+                <a href="/bookings" class="text-gray-300 hover:text-green-400 transition" th:classappend="${activePage == 'bookings'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-calendar-check"></i> Bookings
+                </a>
+                <a href="/submitted-orders" class="text-gray-300 hover:text-green-400 transition" th:classappend="${activePage == 'submitted-orders'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-check-circle"></i> Submitted Orders
+                </a>
+                <a href="/job-monitoring" class="text-white hover:text-green-200 transition">
+                    <i class="bi bi-kanban"></i> Job Monitoring
+                </a>
+
+                <!-- Master Menu Dropdown -->
+                <div class="relative group">
+                    <button class="text-gray-300 hover:text-green-400 transition flex items-center" th:classappend="${activePage == 'master'} ? 'text-white font-medium' : ''">
+                        <i class="bi bi-database"></i> Master
+                        <i class="bi bi-chevron-down ml-1 text-xs"></i>
+                    </button>
+                    <div class="absolute left-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                        <a href="/master/cities" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400 rounded-t-lg" th:classappend="${activeSubPage == 'cities'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-geo-alt"></i> Cities
+                        </a>
+                        <a href="/master/items" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400" th:classappend="${activeSubPage == 'items'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-box"></i> Items
+                        </a>
+                        <a href="/master/branches" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400" th:classappend="${activeSubPage == 'branches'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-building"></i> Branches
+                        </a>
+                        <a href="/master/pincodes" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400" th:classappend="${activeSubPage == 'pincodes'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-pin-map"></i> Pincodes
+                        </a>
+                        <a href="/master/fit-types" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400" th:classappend="${activeSubPage == 'fit-types'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-tools"></i> Fit Types
+                        </a>
+                        <a href="/master/carpenters" class="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-green-400 rounded-b-lg" th:classappend="${activeSubPage == 'carpenters'} ? 'text-white bg-gray-700' : ''">
+                            <i class="bi bi-person-workspace"></i> Carpenters
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Info & Logout -->
+            <div class="flex items-center space-x-4">
+                <span class="text-white">
+                    <i class="bi bi-person-circle"></i>
+                    <span sec:authentication="principal.fullName" class="font-medium"></span>
+                </span>
+                <form th:action="@{/logout}" method="post" class="inline">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </form>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button id="mobileMenuBtn" class="md:hidden text-white">
+                <i class="bi bi-list text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="hidden md:hidden pb-4">
+            <a href="/home" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'home'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-house-fill"></i> Home
+            </a>
+            <a href="/bookings" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'bookings'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-calendar-check"></i> Bookings
+            </a>
+            <a href="/submitted-orders" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'submitted-orders'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-check-circle"></i> Submitted Orders
+            </a>
+            <div class="py-2">
+                <p class="text-gray-400 font-semibold mb-2"><i class="bi bi-database"></i> Master</p>
+                <a href="/master/cities" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'cities'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-geo-alt"></i> Cities
+                </a>
+                <a href="/master/items" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'items'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-box"></i> Items
+                </a>
+                <a href="/master/branches" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'branches'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-building"></i> Branches
+                </a>
+                <a href="/master/pincodes" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'pincodes'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-pin-map"></i> Pincodes
+                </a>
+                <a href="/master/fit-types" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'fit-types'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-tools"></i> Fit Types
+                </a>
+                <a href="/master/carpenters" class="block py-2 pl-4 text-gray-300 hover:text-green-400" th:classappend="${activeSubPage == 'carpenters'} ? 'text-white font-medium' : ''">
+                    <i class="bi bi-person-workspace"></i> Carpenters
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Toggle Script -->
+    <script>
+        document.getElementById('mobileMenuBtn')?.addEventListener('click', function() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        });
+    </script>
+</nav>
+</body>
+</html>

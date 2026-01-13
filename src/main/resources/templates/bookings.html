@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head :: common-head('Bookings')"></head>
+<body class="bg-gray-50">
+<div th:replace="fragments/navigation :: navbar"></div>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-6">
+        <h2 class="text-3xl font-bold text-gray-800">
+            <i class="bi bi-calendar-check"></i> Bookings Management
+        </h2>
+        <p class="text-gray-600">Manage and submit customer bookings</p>
+    </div>
+    <div id="react-root"></div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="gradient-bg text-white p-6 rounded-t-xl">
+            <h3 class="text-2xl font-bold"><i class="bi bi-pencil-square"></i> Edit Booking</h3>
+        </div>
+        <div class="p-6">
+            <form id="editForm">
+                <input type="hidden" id="editBookingId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                        <input type="text" id="editCustomerName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                        <input type="text" id="editCustomerMobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="date" id="editDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                        <input type="time" id="editTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
+                        <input type="text" id="editEmployeeName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Employee Phone</label>
+                        <input type="text" id="editEmployeePhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                    <textarea id="editAddress" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes / Remarks</label>
+                    <textarea id="editNotes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Add any notes or remarks..."></textarea>
+                </div>
+                <div class="flex space-x-3">
+                    <button type="submit" class="flex-1 gradient-bg text-white py-3 rounded-lg hover:opacity-90 transition font-semibold">
+                        <i class="bi bi-save"></i> Save Changes
+                    </button>
+                    <button type="button" onclick="closeEditModal()" class="flex-1 bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition font-semibold">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- History Modal -->
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <div class="gradient-bg text-white p-6 rounded-t-xl">
+            <h3 class="text-2xl font-bold"><i class="bi bi-clock-history"></i> Booking History</h3>
+        </div>
+        <div class="p-6">
+            <div id="historyContent"></div>
+            <button onclick="closeHistoryModal()" class="w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition font-semibold mt-4">
+                <i class="bi bi-x-circle"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- React + Babel -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- JSX stored inside a JS string so Thymeleaf never parses it -->
+<script th:inline="none">
+    const BOOKINGS_JSX = `
+    const { useState, useEffect } = React;
+
+    // CSRF for axios
+    const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+    axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+    // Local cache (frontend-only fallback)
+    const CACHE_KEY = 'instafit_bookings_cache_v1';
+
+    const saveCache = (list) => {
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(list || [])); } catch (e) {}
+    };
+
+    const loadCache = () => {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    };
+
+    const toast = (icon, title) => Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon,
+      title,
+      showConfirmButton: false,
+      timer: 2500,
+      timerProgressBar: true
+    });
+
+    function BookingsTable() {
+      const [bookings, setBookings] = useState([]);
+      const [filteredBookings, setFilteredBookings] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [expandedRows, setExpandedRows] = useState(new Set());
+      const [filters, setFilters] = useState({
+        status: '', customerName: '', orderNo: '', serviceName: '', dateFrom: '', dateTo: ''
+      });
+
+      useEffect(() => { fetchBookings(); }, []);
+      useEffect(() => { applyFilters(); }, [filters, bookings]);
+
+      const fetchBookings = async () => {
+        setLoading(true);
+        try {
+          const response = await axios.get('/api/bookings/fetch');
+
+          const apiList = (response?.data?.success ? (response.data.data || []) : []);
+          const nonSubmitted = apiList.filter(b => b.status !== 'Submitted');
+
+          if (nonSubmitted.length > 0) {
+            setBookings(nonSubmitted);
+            setFilteredBookings(nonSubmitted);
+            saveCache(nonSubmitted);
+            toast('success', 'Bookings loaded');
+            return;
+          }
+
+          const cached = loadCache();
+          if (cached.length > 0) {
+            setBookings(cached);
+            setFilteredBookings(cached);
+            toast('info', 'No new bookings. Showing saved data');
+          } else {
+            setBookings([]);
+            setFilteredBookings([]);
+            Swal.fire({
+              icon: 'warning',
+              title: 'No bookings found',
+              text: 'API returned empty and no saved data exists in browser cache.',
+              confirmButtonColor: '#689F38'
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching bookings:', error);
+
+          const cached = loadCache();
+          if (cached.length > 0) {
+            setBookings(cached);
+            setFilteredBookings(cached);
+            Swal.fire({
+              icon: 'error',
+              title: 'Fetch failed',
+              text: 'Server/Supabase fetch failed. Showing last saved bookings.',
+              confirmButtonColor: '#689F38'
+            });
+          } else {
+            setBookings([]);
+            setFilteredBookings([]);
+            Swal.fire({
+              icon: 'error',
+              title: 'Fetch failed',
+              text: 'Server/Supabase fetch failed and no saved data exists in browser cache.',
+              confirmButtonColor: '#689F38'
+            });
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const applyFilters = () => {
+        let filtered = [...bookings];
+        if (filters.status) filtered = filtered.filter(b => b.status === filters.status);
+        if (filters.customerName) filtered = filtered.filter(b => b.customerName?.toLowerCase().includes(filters.customerName.toLowerCase()));
+        if (filters.orderNo) filtered = filtered.filter(b => b.orderNo?.toLowerCase().includes(filters.orderNo.toLowerCase()));
+        if (filters.serviceName) filtered = filtered.filter(b => b.serviceName?.toLowerCase().includes(filters.serviceName.toLowerCase()));
+        if (filters.dateFrom) filtered = filtered.filter(b => b.date >= filters.dateFrom);
+        if (filters.dateTo) filtered = filtered.filter(b => b.date <= filters.dateTo);
+        setFilteredBookings(filtered);
+      };
+
+      const handleFilterChange = (field, value) => setFilters(prev => ({ ...prev, [field]: value }));
+      const clearFilters = () => setFilters({ status: '', customerName: '', orderNo: '', serviceName: '', dateFrom: '', dateTo: '' });
+
+      const openEditModal = (booking) => {
+        document.getElementById('editBookingId').value = booking.id;
+        document.getElementById('editCustomerName').value = booking.customerName || '';
+        document.getElementById('editCustomerMobile').value = booking.customerMobile || '';
+        document.getElementById('editDate').value = booking.date || '';
+        document.getElementById('editTime').value = booking.bookingTime || '';
+        document.getElementById('editEmployeeName').value = booking.employeeName || '';
+        document.getElementById('editEmployeePhone').value = booking.employeePhone || '';
+        document.getElementById('editAddress').value = booking.address || '';
+        document.getElementById('editNotes').value = booking.notes || '';
+        document.getElementById('editModal').classList.add('show');
+      };
+
+      const viewHistory = async (bookingId) => {
+        try {
+          const response = await axios.get(\`/api/bookings/\${bookingId}/history\`);
+          if (response.data.success) {
+            const history = response.data.data;
+            if (history.length === 0) {
+              Swal.fire({
+                icon: 'info',
+                title: 'No history',
+                text: 'No history available for this booking',
+                confirmButtonColor: '#689F38'
+              });
+              return;
+            }
+            let historyHTML = '<div class="space-y-4">';
+            history.forEach((log) => {
+              const actionColor = ({
+                'FETCHED': 'bg-blue-100 text-blue-800',
+                'UPDATED': 'bg-yellow-100 text-yellow-800',
+                'SUBMITTED': 'bg-green-100 text-green-800'
+              }[log.actionType] || 'bg-gray-100 text-gray-800');
+
+              historyHTML += \`
+                <div class="border-l-4 border-green-500 pl-4 py-2">
+                  <div class="flex justify-between items-start mb-2">
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold \${actionColor}">\${log.actionType}</span>
+                    <span class="text-xs text-gray-500">\${new Date(log.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p class="text-sm"><strong>By:</strong> \${log.changedBy}</p>
+                  \${log.notes ? \`<p class="text-sm text-gray-600">\${log.notes}</p>\` : ''}
+                  \${log.newValue ? \`<div class="mt-2 bg-gray-50 p-2 rounded text-xs"><pre>\${log.newValue}</pre></div>\` : ''}
+                  \${log.ipAddress ? \`<p class="text-xs text-gray-400 mt-1">IP: \${log.ipAddress}</p>\` : ''}
+                </div>
+              \`;
+            });
+            historyHTML += '</div>';
+            document.getElementById('historyContent').innerHTML = historyHTML;
+            document.getElementById('historyModal').classList.add('show');
+          }
+        } catch (error) {
+          console.error('Error fetching history:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to fetch booking history',
+            confirmButtonColor: '#689F38'
+          });
+        }
+      };
+
+      const submitBooking = async (bookingId) => {
+        const result = await Swal.fire({
+          title: 'Submit Booking?',
+          text: 'Once submitted, it will move to Submitted Orders.',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#689F38',
+          cancelButtonColor: '#6b7280',
+          confirmButtonText: 'Yes, submit',
+          cancelButtonText: 'Cancel',
+          reverseButtons: true
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+          Swal.fire({
+            title: 'Submitting...',
+            text: 'Please wait',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => Swal.showLoading()
+          });
+
+          const response = await axios.post(\`/api/bookings/\${bookingId}/submit\`);
+
+          if (response.data && response.data.success) {
+            await Swal.fire({
+              icon: 'success',
+              title: 'Submitted!',
+              text: 'Booking submitted successfully.',
+              confirmButtonColor: '#689F38'
+            });
+
+            // refresh list on same page
+            fetchBookings();
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Failed',
+              text: (response.data && response.data.message) ? response.data.message : 'Unable to submit booking.',
+              confirmButtonColor: '#689F38'
+            });
+          }
+        } catch (error) {
+          console.error('Error submitting booking:', error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Something went wrong while submitting.',
+            confirmButtonColor: '#689F38'
+          });
+        }
+      };
+
+      const toggleRow = (id) => {
+        setExpandedRows(prev => {
+          const s = new Set(prev);
+          s.has(id) ? s.delete(id) : s.add(id);
+          return s;
+        });
+      };
+
+      const getStatusColor = (status) => ({
+        'Pending': 'bg-yellow-100 text-yellow-800',
+        'Confirmed': 'bg-blue-100 text-blue-800',
+        'Paid': 'bg-green-100 text-green-800',
+        'Work Done': 'bg-purple-100 text-purple-800',
+        'Cancelled': 'bg-red-100 text-red-800'
+      }[status] || 'bg-gray-100 text-gray-800');
+
+      // serviceTypes might already be an array (if your backend maps it),
+      // OR it might be a JSON string. handle both.
+      const parseServiceTypes = (serviceTypes) => {
+        if (Array.isArray(serviceTypes)) return serviceTypes;
+        try { return JSON.parse(serviceTypes); } catch { return []; }
+      };
+
+      if (loading) {
+        return (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-green-500 border-t-transparent"></div>
+            <p className="mt-4 text-gray-600">Fetching bookings from server...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Work Done">Work Done</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.customerName}
+                  onChange={(e) => handleFilterChange('customerName', e.target.value)}
+                  placeholder="Search..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Order No</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.orderNo}
+                  onChange={(e) => handleFilterChange('orderNo', e.target.value)}
+                  placeholder="Search..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.serviceName}
+                  onChange={(e) => handleFilterChange('serviceName', e.target.value)}
+                  placeholder="Search..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.dateFrom}
+                  onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={filters.dateTo}
+                  onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-x-2">
+                <button
+                  className="gradient-bg text-white px-4 py-2 rounded-lg hover:opacity-90 transition font-semibold"
+                  onClick={fetchBookings}
+                >
+                  <i className="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button
+                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition font-semibold"
+                  onClick={clearFilters}
+                >
+                  <i className="bi bi-x-circle"></i> Clear Filters
+                </button>
+              </div>
+              <span className="text-gray-600 font-medium">
+                Showing {filteredBookings.length} of {bookings.length} bookings
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="gradient-bg text-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Expand</th>
+                    <th className="px-4 py-3 text-left">Order No</th>
+                    <th className="px-4 py-3 text-left">Customer</th>
+                    <th className="px-4 py-3 text-left">Mobile</th>
+                    <th className="px-4 py-3 text-left">Service</th>
+                    <th className="px-4 py-3 text-left">Date &amp; Time</th>
+                    <th className="px-4 py-3 text-left">Amount</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" className="px-4 py-12 text-center">
+                        <i className="bi bi-inbox text-6xl text-gray-300"></i>
+                        <p className="text-gray-500 mt-4 text-lg">No bookings found</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBookings.map(booking => (
+                      <React.Fragment key={booking.id}>
+                        <tr className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3">
+                            <i
+                              className={\`bi bi-chevron-right cursor-pointer transition-transform text-lg \${expandedRows.has(booking.id) ? 'rotate-90' : ''}\`}
+                              onClick={() => toggleRow(booking.id)}
+                            ></i>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-green-600">{booking.orderNo}</td>
+                          <td className="px-4 py-3">{booking.customerName}</td>
+                          <td className="px-4 py-3">{booking.customerMobile}</td>
+                          <td className="px-4 py-3">{booking.serviceName}</td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm">
+                              <div className="font-medium">{booking.date}</div>
+                              <div className="text-gray-500">{booking.bookingTime}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-green-600">₹{booking.totalPrice}</td>
+                          <td className="px-4 py-3">
+                            <span className={\`px-3 py-1 rounded-full text-xs font-semibold \${getStatusColor(booking.status)}\`}>
+                              {booking.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex space-x-2">
+                              <button
+                                className="bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition text-sm font-medium"
+                                onClick={() => viewHistory(booking.id)}
+                                title="View History"
+                              >
+                                <i className="bi bi-clock-history"></i>
+                              </button>
+
+                              <button
+                                className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                                onClick={() => openEditModal(booking)}
+                                title="Edit Booking"
+                              >
+                                <i className="bi bi-pencil"></i>
+                              </button>
+
+                              <button
+                                className="gradient-bg text-white px-3 py-1 rounded-lg hover:opacity-90 transition text-sm font-medium"
+                                onClick={() => submitBooking(booking.id)}
+                                title="Submit Booking"
+                              >
+                                <i className="bi bi-check-circle"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {expandedRows.has(booking.id) && (
+                          <tr className="bg-gray-50">
+                            <td colSpan="9" className="px-4 py-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-white p-4 rounded-lg shadow">
+                                  <h6 className="font-bold text-lg mb-3 text-green-600">
+                                    <i className="bi bi-info-circle"></i> Details
+                                  </h6>
+                                  <p className="mb-2">
+                                    <strong>Service Types:</strong><br/>
+                                    <div className="mt-1 space-x-2">
+                                      {parseServiceTypes(booking.serviceTypes).map((type, idx) => (
+                                        <span key={idx} className="inline-block bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm">{type}</span>
+                                      ))}
+                                    </div>
+                                  </p>
+                                  <p className="mb-2"><strong>Address:</strong><br/>{booking.address}</p>
+                                  <p className="mb-2"><strong>Payment ID:</strong> {booking.paymentId}</p>
+                                  {booking.notes && (
+                                    <p className="mb-0">
+                                      <strong>Notes:</strong><br/>
+                                      <span className="text-gray-600 bg-yellow-50 p-2 rounded block mt-1">{booking.notes}</span>
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="bg-white p-4 rounded-lg shadow">
+                                  <h6 className="font-bold text-lg mb-3 text-green-600">
+                                    <i className="bi bi-clock-history"></i> Timeline
+                                  </h6>
+                                  <p className="mb-2"><strong>Created:</strong> {new Date(booking.createdAt).toLocaleString()}</p>
+                                  {booking.employeeName && (
+                                    <p className="mb-0">
+                                      <strong>Assigned To:</strong> {booking.employeeName}<br/>
+                                      <span className="text-gray-600">({booking.employeePhone})</span>
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('react-root'));
+    root.render(<BookingsTable />);
+    `;
+
+    (function () {
+      const compiled = Babel.transform(BOOKINGS_JSX, { presets: ['react'] }).code;
+      new Function(compiled)();
+    })();
+</script>
+
+<!-- Plain JS for modals + edit submit (not JSX) -->
+<script>
+    function closeEditModal() {
+        document.getElementById('editModal').classList.remove('show');
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').classList.remove('show');
+    }
+
+    window.onclick = function(event) {
+        const editModal = document.getElementById('editModal');
+        const historyModal = document.getElementById('historyModal');
+        if (event.target === editModal) closeEditModal();
+        if (event.target === historyModal) closeHistoryModal();
+    }
+
+    document.getElementById('editForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const bookingId = document.getElementById('editBookingId').value;
+        const updatedData = {
+            customerName: document.getElementById('editCustomerName').value,
+            customerMobile: document.getElementById('editCustomerMobile').value,
+            date: document.getElementById('editDate').value,
+            bookingTime: document.getElementById('editTime').value,
+            employeeName: document.getElementById('editEmployeeName').value,
+            employeePhone: document.getElementById('editEmployeePhone').value,
+            address: document.getElementById('editAddress').value,
+            notes: document.getElementById('editNotes').value
+        };
+
+        try {
+            const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+            axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+            Swal.fire({
+              title: 'Saving...',
+              text: 'Please wait',
+              allowOutsideClick: false,
+              allowEscapeKey: false,
+              didOpen: () => Swal.showLoading()
+            });
+
+            const response = await axios.put(`/api/bookings/${bookingId}`, updatedData);
+            if (response.data.success) {
+                await Swal.fire({
+                  icon: 'success',
+                  title: 'Updated!',
+                  text: 'Booking updated successfully!',
+                  confirmButtonColor: '#689F38'
+                });
+                closeEditModal();
+                window.location.reload();
+            } else {
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Failed',
+                  text: 'Failed to update booking: ' + (response.data.message || ''),
+                  confirmButtonColor: '#689F38'
+                });
+            }
+        } catch (error) {
+            console.error('Error updating booking:', error);
+            Swal.fire({
+              icon: 'error',
+              title: 'Error',
+              text: 'Failed to update booking',
+              confirmButtonColor: '#689F38'
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

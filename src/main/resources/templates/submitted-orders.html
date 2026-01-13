@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head :: common-head('Submitted Orders')"></head>
+<body class="bg-gray-50">
+<div th:replace="fragments/navigation :: navbar"></div>
+
+<div class="container mx-auto px-4 py-8">
+  <div class="mb-6 flex justify-between items-center">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-800">
+        <i class="bi bi-check-circle"></i> Submitted Orders
+      </h2>
+      <p class="text-gray-600">Assign orders to carpenters and generate routes</p>
+    </div>
+    <button id="assignBtn" onclick="openAssignModal()" disabled class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed">
+      <i class="bi bi-person-plus"></i> Assign to Carpenter (<span id="selectedCount">0</span>)
+    </button>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="bg-white rounded-xl shadow-md overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full" id="ordersTable">
+        <thead class="gradient-bg text-white">
+        <tr>
+          <th class="px-4 py-3 text-left">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="w-4 h-4">
+          </th>
+          <th class="px-4 py-3 text-left">Order No</th>
+          <th class="px-4 py-3 text-left">Customer</th>
+          <th class="px-4 py-3 text-left">Phone</th>
+          <th class="px-4 py-3 text-left">Address</th>
+          <th class="px-4 py-3 text-left">Pincode</th>
+          <th class="px-4 py-3 text-left">City</th>
+          <th class="px-4 py-3 text-left">Date</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Actions</th>
+        </tr>
+        </thead>
+        <tbody id="ordersTableBody" class="divide-y divide-gray-200">
+        <tr>
+          <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+            <i class="bi bi-hourglass-split text-3xl"></i>
+            <p class="mt-2">Loading orders...</p>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Assignment Modal -->
+<div id="assignModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-2xl font-bold text-gray-800">
+        <i class="bi bi-person-workspace"></i> Assign Orders to Carpenter
+      </h3>
+      <button onclick="closeAssignModal()" class="text-gray-500 hover:text-gray-700">
+        <i class="bi bi-x-lg text-2xl"></i>
+      </button>
+    </div>
+
+    <form id="assignmentForm">
+      <!-- Selected Orders Summary -->
+      <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <p class="font-semibold text-blue-800">
+          <i class="bi bi-list-check"></i> Selected Orders: <span id="modalSelectedCount">0</span>
+        </p>
+        <div id="selectedOrdersList" class="mt-2 text-sm text-blue-700"></div>
+      </div>
+
+      <!-- Carpenter Selection -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Select Carpenter *
+        </label>
+        <select id="carpenterSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required onchange="onCarpenterChange()">
+          <option value="">Loading carpenters...</option>
+        </select>
+      </div>
+
+      <!-- Carpenter Pincode Input -->
+      <div id="carpenterPincodeSection" class="mb-4 hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Carpenter Start Location (Pincode) *
+          <span class="text-xs text-gray-500 font-normal ml-2">
+                        <i class="bi bi-pencil"></i> Pre-filled with default, you can override
+                    </span>
+        </label>
+        <input type="text" id="carpenterPincode" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="Enter carpenter's pincode" pattern="[0-9]{6}" maxlength="6" required>
+        <small class="text-xs text-gray-500">
+          <i class="bi bi-info-circle"></i> This will be used as the starting point for route optimization. Override if needed.
+        </small>
+      </div>
+
+      <!-- Assignment Date -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Assignment Date *
+        </label>
+        <input type="date" id="assignmentDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" required>
+      </div>
+
+      <!-- Auto-Route Option -->
+      <div class="mb-6">
+        <label class="flex items-center">
+          <input type="checkbox" id="autoGenerateRoute" checked class="w-4 h-4 text-green-600 rounded">
+          <span class="ml-2 text-sm text-gray-700">
+                        <i class="bi bi-map"></i> Automatically generate optimized route after assignment
+                    </span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex space-x-4">
+        <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold">
+          <i class="bi bi-check-circle"></i> Assign Orders
+        </button>
+        <button type="button" onclick="closeAssignModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition font-semibold">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+      </div>
+    </form>
+
+    <!-- Route Generation Status -->
+    <div id="routeGenerationStatus" class="hidden mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <div class="flex items-center">
+        <i class="bi bi-hourglass-split text-blue-600 animate-spin text-xl mr-3"></i>
+        <p class="text-blue-800 font-semibold">Generating optimized route...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Geocode Fix Modal -->
+<div id="geocodeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold text-gray-800">
+        <i class="bi bi-geo-alt"></i> Fix Location
+      </h3>
+      <button onclick="closeGeocodeModal()" class="text-gray-500 hover:text-gray-700">
+        <i class="bi bi-x-lg text-xl"></i>
+      </button>
+    </div>
+
+    <p class="text-gray-600 mb-4">
+      Unable to automatically locate this address. Please enter the pincode manually:
+    </p>
+
+    <form id="geocodeForm">
+      <input type="hidden" id="geocodeBookingId">
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Pincode *
+        </label>
+        <input type="text" id="manualPincode" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Enter 6-digit pincode" pattern="[0-9]{6}" maxlength="6" required>
+      </div>
+
+      <div class="flex space-x-4">
+        <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold">
+          <i class="bi bi-check-circle"></i> Update Location
+        </button>
+        <button type="button" onclick="closeGeocodeModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition font-semibold">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script th:inline="javascript">
+  /*<![CDATA[*/
+  const csrfToken = /*[[${_csrf.token}]]*/ 'default-token';
+  const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+  axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+  let orders = [];
+  let carpenters = [];
+  let selectedOrders = new Set();
+
+  document.addEventListener('DOMContentLoaded', function() {
+      loadOrders();
+      loadCarpenters();
+      setMinDate();
+  });
+
+  function setMinDate() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('assignmentDate').setAttribute('min', today);
+      document.getElementById('assignmentDate').value = today;
+  }
+
+  async function loadOrders() {
+      try {
+          const response = await axios.get('/api/bookings/submitted');
+          orders = response.data;
+          renderOrders();
+      } catch (error) {
+          console.error('Error loading orders:', error);
+          showMessage('Error loading orders', 'error');
+      }
+  }
+
+  async function loadCarpenters() {
+      try {
+          const response = await axios.get('/api/carpenters/active');
+          carpenters = response.data;
+          populateCarpenterDropdown();
+      } catch (error) {
+          console.error('Error loading carpenters:', error);
+      }
+  }
+
+  function populateCarpenterDropdown() {
+      const select = document.getElementById('carpenterSelect');
+      select.innerHTML = '<option value="">Select Carpenter</option>';
+
+      carpenters.forEach(carpenter => {
+          const option = document.createElement('option');
+          option.value = carpenter.carpenterId;
+          option.textContent = `${carpenter.carpenterId} - ${carpenter.carpenterName}`;
+          option.dataset.pincode = carpenter.pincode || '';
+          select.appendChild(option);
+      });
+  }
+
+  function onCarpenterChange() {
+      const select = document.getElementById('carpenterSelect');
+      const selectedOption = select.options[select.selectedIndex];
+      const pincodeSection = document.getElementById('carpenterPincodeSection');
+      const pincodeInput = document.getElementById('carpenterPincode');
+
+      if (select.value) {
+          pincodeSection.classList.remove('hidden');
+
+          const carpenterPincode = selectedOption.dataset.pincode;
+          if (carpenterPincode && carpenterPincode !== 'null' && carpenterPincode !== '') {
+              pincodeInput.value = carpenterPincode;
+              pincodeInput.style.borderColor = '#10b981';
+          } else {
+              pincodeInput.value = '';
+              pincodeInput.style.borderColor = '#d1d5db';
+          }
+      } else {
+          pincodeSection.classList.add('hidden');
+          pincodeInput.value = '';
+      }
+  }
+
+  function renderOrders() {
+      const tbody = document.getElementById('ordersTableBody');
+
+      if (orders.length === 0) {
+          tbody.innerHTML = `
+              <tr>
+                  <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                      <i class="bi bi-inbox text-3xl"></i>
+                      <p class="mt-2">No submitted orders found</p>
+                  </td>
+              </tr>
+          `;
+          return;
+      }
+
+      tbody.innerHTML = orders.map(order => {
+          // Extract pincode and city from address
+          const pincode = extractPincodeFromAddress(order.address);
+          const city = extractCityFromAddress(order.address);
+
+          return `
+              <tr class="hover:bg-gray-50 ${selectedOrders.has(order.id) ? 'bg-green-50' : ''}">
+                  <td class="px-4 py-3">
+                      <input type="checkbox" class="order-checkbox w-4 h-4"
+                             value="${order.id}"
+                             ${selectedOrders.has(order.id) ? 'checked' : ''}
+                             onchange="toggleOrderSelection(${order.id})">
+                  </td>
+                  <td class="px-4 py-3 font-bold text-green-600">${order.orderNo || 'N/A'}</td>
+                  <td class="px-4 py-3">${order.customerName || 'N/A'}</td>
+                  <td class="px-4 py-3">${order.customerMobile || 'N/A'}</td>
+                  <td class="px-4 py-3 max-w-xs truncate" title="${order.address || 'N/A'}">
+                      ${order.address || 'N/A'}
+                  </td>
+                  <td class="px-4 py-3"><span class="font-semibold text-blue-600">${pincode || 'N/A'}</span></td>
+                  <td class="px-4 py-3">${city || 'N/A'}</td>
+                  <td class="px-4 py-3">${formatDate(order.createdAt)}</td>
+                  <td class="px-4 py-3">
+                      <span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">
+                          ${order.assignmentStatus || 'SUBMITTED'}
+                      </span>
+                  </td>
+                  <td class="px-4 py-3">
+                      <button onclick="viewOrderDetails(${order.id})" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition text-sm">
+                          <i class="bi bi-eye"></i> View
+                      </button>
+                  </td>
+              </tr>
+          `;
+      }).join('');
+  }
+
+  // Helper function to extract pincode from address
+  function extractPincodeFromAddress(address) {
+      if (!address) return null;
+
+      const lastDashIndex = address.lastIndexOf('-');
+      if (lastDashIndex === -1) return null;
+
+      const afterDash = address.substring(lastDashIndex + 1).trim();
+
+      // Check if it's a 6-digit pincode
+      if (/^[0-9]{6}$/.test(afterDash)) {
+          return afterDash;
+      }
+
+      return null;
+  }
+
+  // Helper function to extract city from address
+  function extractCityFromAddress(address) {
+      if (!address) return 'Unknown';
+
+      const lastDashIndex = address.lastIndexOf('-');
+      if (lastDashIndex === -1) return 'Unknown';
+
+      const addressPart = address.substring(0, lastDashIndex).trim();
+      const parts = addressPart.split(',');
+
+      if (parts.length >= 2) {
+          // Return the last part before pincode (usually city/state)
+          return parts[parts.length - 1].trim();
+      }
+
+      return 'Unknown';
+  }
+
+  function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('.order-checkbox');
+
+      if (selectAll.checked) {
+          checkboxes.forEach(checkbox => {
+              checkbox.checked = true;
+              selectedOrders.add(parseInt(checkbox.value));
+          });
+      } else {
+          checkboxes.forEach(checkbox => {
+              checkbox.checked = false;
+          });
+          selectedOrders.clear();
+      }
+
+      updateSelectionUI();
+  }
+
+  function toggleOrderSelection(orderId) {
+      if (selectedOrders.has(orderId)) {
+          selectedOrders.delete(orderId);
+      } else {
+          selectedOrders.add(orderId);
+      }
+
+      updateSelectionUI();
+      renderOrders();
+  }
+
+  function updateSelectionUI() {
+      const count = selectedOrders.size;
+      document.getElementById('selectedCount').textContent = count;
+      document.getElementById('assignBtn').disabled = count === 0;
+
+      const selectAll = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('.order-checkbox');
+      selectAll.checked = checkboxes.length > 0 && count === checkboxes.length;
+  }
+
+  function openAssignModal() {
+      if (selectedOrders.size === 0) return;
+
+      document.getElementById('modalSelectedCount').textContent = selectedOrders.size;
+
+      const selectedOrdersList = document.getElementById('selectedOrdersList');
+      const selectedOrderNumbers = Array.from(selectedOrders)
+          .map(id => orders.find(o => o.id === id)?.orderNo || id)
+          .join(', ');
+      selectedOrdersList.textContent = selectedOrderNumbers;
+
+      document.getElementById('assignModal').classList.remove('hidden');
+  }
+
+  function closeAssignModal() {
+      document.getElementById('assignModal').classList.add('hidden');
+      document.getElementById('assignmentForm').reset();
+      document.getElementById('carpenterPincodeSection').classList.add('hidden');
+      document.getElementById('routeGenerationStatus').classList.add('hidden');
+  }
+
+  document.getElementById('assignmentForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const carpenterId = document.getElementById('carpenterSelect').value;
+      const carpenterPincode = document.getElementById('carpenterPincode').value;
+      const assignmentDate = document.getElementById('assignmentDate').value;
+      const autoRoute = document.getElementById('autoGenerateRoute').checked;
+
+      if (!carpenterId || !carpenterPincode || !assignmentDate) {
+          showMessage('Please fill all required fields', 'error');
+          return;
+      }
+
+      if (!/^[0-9]{6}$/.test(carpenterPincode)) {
+          showMessage('Please enter a valid 6-digit pincode', 'error');
+          return;
+      }
+
+      try {
+          const assignResponse = await axios.post('/api/carpenter-assignment/assign', {
+              bookingIds: Array.from(selectedOrders),
+              carpenterId: carpenterId,
+              assignedDate: assignmentDate
+          });
+
+          if (assignResponse.data.success) {
+              showMessage(assignResponse.data.message, 'success');
+
+              if (autoRoute) {
+                  document.getElementById('routeGenerationStatus').classList.remove('hidden');
+
+                  const routeResponse = await axios.post('/api/carpenter-assignment/generate-route', {
+                      carpenterId: carpenterId,
+                      routeDate: assignmentDate,
+                      startPincode: carpenterPincode
+                  });
+
+                  if (routeResponse.data.success) {
+                      showMessage('Route optimized successfully! ' + routeResponse.data.message, 'success');
+                  } else {
+                      showMessage('Orders assigned but route optimization failed: ' + routeResponse.data.message, 'warning');
+                  }
+              }
+
+              selectedOrders.clear();
+              updateSelectionUI();
+              closeAssignModal();
+              loadOrders();
+          } else {
+              showMessage(assignResponse.data.message, 'error');
+          }
+      } catch (error) {
+          console.error('Error assigning orders:', error);
+          showMessage('Error assigning orders: ' + (error.response?.data?.message || error.message), 'error');
+      }
+  });
+
+  function openGeocodeModal(bookingId) {
+      document.getElementById('geocodeBookingId').value = bookingId;
+      document.getElementById('geocodeModal').classList.remove('hidden');
+  }
+
+  function closeGeocodeModal() {
+      document.getElementById('geocodeModal').classList.add('hidden');
+      document.getElementById('geocodeForm').reset();
+  }
+
+  document.getElementById('geocodeForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const bookingId = document.getElementById('geocodeBookingId').value;
+      const pincode = document.getElementById('manualPincode').value;
+
+      try {
+          const response = await axios.post(`/api/carpenter-assignment/update-geocode/${bookingId}?pincode=${pincode}`);
+
+          if (response.data.success) {
+              showMessage('Location updated successfully', 'success');
+              closeGeocodeModal();
+              loadOrders();
+          } else {
+              showMessage(response.data.message, 'error');
+          }
+      } catch (error) {
+          console.error('Error updating geocode:', error);
+          showMessage('Error updating location', 'error');
+      }
+  });
+
+  function viewOrderDetails(orderId) {
+      alert('View order details: ' + orderId);
+  }
+
+  function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-IN');
+  }
+
+  function showMessage(message, type) {
+      alert(message);
+  }
+  /*]]>*/
+</script>
+
+</body>
+</html>

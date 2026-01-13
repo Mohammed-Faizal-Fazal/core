@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+<nav th:fragment="navbar" class="bg-gray-900 shadow-lg sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center py-3">
+            <!-- Logo -->
+            <a href="/carpenter/home" class="flex items-center">
+                <img th:src="@{/images/logo.jpeg}" alt="INSTAFITCORE" class="h-12 rounded">
+            </a>
+
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex space-x-6">
+                <a href="/carpenter/home" th:classappend="${activePage == 'carpenter-home'} ? 'text-white font-medium' : 'text-gray-300'" class="hover:text-green-400 transition">
+                    <i class="bi bi-house-door"></i> Home
+                </a>
+                <a href="/carpenter/my-jobs" th:classappend="${activePage == 'my-jobs'} ? 'text-white font-medium' : 'text-gray-300'" class="hover:text-green-400 transition">
+                    <i class="bi bi-briefcase"></i> My Jobs
+                </a>
+                <a href="/carpenter/profile" th:classappend="${activePage == 'profile'} ? 'text-white font-medium' : 'text-gray-300'" class="hover:text-green-400 transition">
+                    <i class="bi bi-person-circle"></i> Profile
+                </a>
+            </div>
+
+            <!-- User Info & Logout -->
+            <div class="flex items-center space-x-4">
+                <span class="text-white">
+                    <i class="bi bi-person-circle"></i>
+                    <span sec:authentication="principal.fullName" class="font-medium"></span>
+                </span>
+                <form th:action="@{/logout}" method="post" class="inline">
+                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </form>
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button id="carpenterMobileMenuBtn" class="md:hidden text-white">
+                <i class="bi bi-list text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="carpenterMobileMenu" class="hidden md:hidden pb-4">
+            <a href="/carpenter/home" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'carpenter-home'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-house-door"></i> Home
+            </a>
+            <a href="/carpenter/my-jobs" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'my-jobs'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-briefcase"></i> My Jobs
+            </a>
+            <a href="/carpenter/profile" class="block py-2 text-gray-300 hover:text-green-400" th:classappend="${activePage == 'profile'} ? 'text-white font-medium' : ''">
+                <i class="bi bi-person-circle"></i> Profile
+            </a>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Toggle Script -->
+    <script>
+        document.getElementById('carpenterMobileMenuBtn')?.addEventListener('click', function() {
+            const menu = document.getElementById('carpenterMobileMenu');
+            menu.classList.toggle('hidden');
+        });
+    </script>
+</nav>
+</body>
+</html>

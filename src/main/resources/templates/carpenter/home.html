@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head :: common-head('Carpenter Dashboard')"></head>
+<script th:src="@{'https://maps.googleapis.com/maps/api/js?key=' + ${googleMapsApiKey} + '&libraries=geometry,places'}"></script>
+<body class="bg-gray-50">
+<div th:replace="fragments/carpenter-navigation :: navbar"></div>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-6 flex justify-between items-center flex-wrap gap-4">
+        <div>
+            <h2 class="text-3xl font-bold text-gray-800">
+                <i class="bi bi-person-workspace"></i> Welcome, <span sec:authentication="principal.fullName">Carpenter</span>!
+            </h2>
+            <p class="text-gray-600">Carpenter ID: <span class="font-semibold" id="carpenterIdDisplay">Loading...</span></p>
+        </div>
+
+        <!-- Date Selector -->
+        <div class="flex items-center space-x-3">
+            <label class="text-sm font-medium text-gray-700">View Date:</label>
+            <input type="date" id="selectedDate" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="loadRouteForDate()">
+        </div>
+    </div>
+
+    <!-- Dashboard Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Today's Jobs</p>
+                    <h3 class="text-3xl font-bold text-blue-600" id="todayJobsCount">0</h3>
+                </div>
+                <div class="bg-blue-100 rounded-full p-4">
+                    <i class="bi bi-calendar-check text-3xl text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Pending</p>
+                    <h3 class="text-3xl font-bold text-orange-600" id="pendingCount">0</h3>
+                </div>
+                <div class="bg-orange-100 rounded-full p-4">
+                    <i class="bi bi-clock-history text-3xl text-orange-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Completed</p>
+                    <h3 class="text-3xl font-bold text-green-600" id="completedCount">0</h3>
+                </div>
+                <div class="bg-green-100 rounded-full p-4">
+                    <i class="bi bi-check-circle text-3xl text-green-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 text-sm">Total Distance</p>
+                    <h3 class="text-2xl font-bold text-purple-600" id="totalDistance">0 km</h3>
+                </div>
+                <div class="bg-purple-100 rounded-full p-4">
+                    <i class="bi bi-map text-3xl text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Map Section -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h3 class="text-xl font-bold text-gray-800">
+                <i class="bi bi-map"></i> Route Map for <span id="displayDate">Today</span>
+            </h3>
+            <div class="flex space-x-2">
+                <button onclick="refreshRoute()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button onclick="openInGoogleMaps()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm">
+                    <i class="bi bi-box-arrow-up-right"></i> Open in Google Maps
+                </button>
+            </div>
+        </div>
+
+        <div id="mapContainer" class="w-full h-[500px] rounded-lg border border-gray-300 relative">
+            <div id="map" class="w-full h-full rounded-lg"></div>
+            <div id="mapLoading" class="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center">
+                <div class="text-center">
+                    <i class="bi bi-hourglass-split text-4xl text-blue-600 animate-spin"></i>
+                    <p class="mt-2 text-gray-700 font-semibold">Loading route map...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Route Summary -->
+        <div id="routeSummary" class="mt-4 p-4 bg-gray-50 rounded-lg hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <p class="text-sm text-gray-600">Total Orders</p>
+                    <p class="text-lg font-bold text-gray-800" id="routeOrdersCount">0</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Estimated Distance</p>
+                    <p class="text-lg font-bold text-gray-800" id="routeDistance">0 km</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Estimated Time</p>
+                    <p class="text-lg font-bold text-gray-800" id="routeDuration">0 mins</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders List -->
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <h3 class="text-xl font-bold mb-4">
+            <i class="bi bi-list-check"></i> My Orders for <span id="ordersDisplayDate">Today</span>
+        </h3>
+
+        <div id="ordersContainer">
+            <div class="text-center py-8 text-gray-500">
+                <i class="bi bi-hourglass-split text-3xl"></i>
+                <p class="mt-2">Loading orders...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const csrfToken = /*[[${_csrf.token}]]*/ 'default-token';
+    const csrfHeader = /*[[${_csrf.headerName}]]*/ 'X-CSRF-TOKEN';
+    axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+    let map;
+    let markers = [];
+    let directionsService;
+    let directionsRenderer;
+    let currentCarpenterId = null;
+    let currentOrders = [];
+    let routeData = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchCarpenterIdFromBackend();
+
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('selectedDate').value = today;
+
+        initMap();
+    });
+
+    async function fetchCarpenterIdFromBackend() {
+        try {
+            const response = await axios.get('/api/carpenters/current');
+            if (response.data && response.data.carpenterId) {
+                currentCarpenterId = response.data.carpenterId;
+                document.getElementById('carpenterIdDisplay').textContent = response.data.carpenterId;
+
+                loadRouteForDate();
+            }
+        } catch (error) {
+            console.error('Error fetching carpenter ID:', error);
+            showMessage('Error loading carpenter information');
+        }
+    }
+
+    function initMap() {
+        const defaultCenter = { lat: 12.9716, lng: 77.5946 };
+
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 12,
+            center: defaultCenter,
+            mapTypeControl: true,
+            streetViewControl: false,
+            fullscreenControl: true
+        });
+
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: false,
+            polylineOptions: {
+                strokeColor: '#16a34a',
+                strokeWeight: 5
+            }
+        });
+    }
+
+    async function loadRouteForDate() {
+        if (!currentCarpenterId) {
+            console.log('Waiting for carpenter ID...');
+            return;
+        }
+
+        const selectedDate = document.getElementById('selectedDate').value;
+
+        document.getElementById('mapLoading').classList.remove('hidden');
+        document.getElementById('displayDate').textContent = formatDateDisplay(selectedDate);
+        document.getElementById('ordersDisplayDate').textContent = formatDateDisplay(selectedDate);
+
+        try {
+            const response = await axios.get(`/api/carpenter-assignment/route/${currentCarpenterId}?date=${selectedDate}`);
+
+            if (response.data.success) {
+                currentOrders = response.data.bookings || [];
+                routeData = response.data.route;
+
+                updateDashboardStats();
+                renderOrdersList();
+                renderRouteOnMap();
+            } else {
+                showNoRouteMessage();
+            }
+        } catch (error) {
+            console.error('Error loading route:', error);
+            showNoRouteMessage();
+        } finally {
+            document.getElementById('mapLoading').classList.add('hidden');
+        }
+    }
+
+    function updateDashboardStats() {
+        const today = new Date().toISOString().split('T')[0];
+        const selectedDate = document.getElementById('selectedDate').value;
+
+        if (selectedDate === today) {
+            document.getElementById('todayJobsCount').textContent = currentOrders.length;
+        }
+
+        const pending = currentOrders.filter(o => o.assignmentStatus === 'ASSIGNED').length;
+        const completed = currentOrders.filter(o => o.assignmentStatus === 'COMPLETED').length;
+
+        document.getElementById('pendingCount').textContent = pending;
+        document.getElementById('completedCount').textContent = completed;
+
+        if (routeData) {
+            document.getElementById('totalDistance').textContent =
+                routeData.totalDistance ? routeData.totalDistance.toFixed(2) + ' km' : '0 km';
+
+            document.getElementById('routeOrdersCount').textContent = currentOrders.length;
+            document.getElementById('routeDistance').textContent =
+                routeData.totalDistance ? routeData.totalDistance.toFixed(2) + ' km' : '0 km';
+            document.getElementById('routeDuration').textContent =
+                routeData.totalDuration ? routeData.totalDuration + ' mins' : '0 mins';
+
+            document.getElementById('routeSummary').classList.remove('hidden');
+        }
+    }
+
+    function renderOrdersList() {
+        const container = document.getElementById('ordersContainer');
+
+        if (currentOrders.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="bi bi-inbox text-3xl"></i>
+                    <p class="mt-2">No orders assigned for this date</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = currentOrders.map((order, index) => {
+            const pincode = extractPincodeFromAddress(order.address);
+
+            return `
+                <div class="border-l-4 ${getStatusBorderColor(order.assignmentStatus)} pl-4 py-3 mb-3 bg-gray-50 rounded-r-lg">
+                    <div class="flex justify-between items-start flex-wrap gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2 flex-wrap">
+                                <span class="bg-green-600 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                    #${order.routeOrder || index + 1}
+                                </span>
+                                <h4 class="font-semibold text-gray-800">${order.orderNo || 'Order #' + order.id}</h4>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(order.assignmentStatus)}">
+                                    ${order.assignmentStatus || 'ASSIGNED'}
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                <div>
+                                    <p class="text-gray-600"><i class="bi bi-person"></i> ${order.customerName || 'N/A'}</p>
+                                    <p class="text-gray-600"><i class="bi bi-telephone"></i> ${order.customerMobile || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600 truncate" title="${order.address || 'N/A'}"><i class="bi bi-geo-alt"></i> ${order.address || 'N/A'}</p>
+                                    <p class="text-gray-600"><i class="bi bi-pin-map"></i> <span class="font-semibold text-blue-600">${pincode || 'N/A'}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col space-y-2">
+                            <button onclick="navigateToOrder(${order.latitude}, ${order.longitude})"
+                                    class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition text-sm whitespace-nowrap"
+                                    ${!order.latitude ? 'disabled' : ''}>
+                                <i class="bi bi-navigation"></i> Navigate
+                            </button>
+                            <button onclick="viewOrderDetails(${order.id})"
+                                    class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition text-sm whitespace-nowrap">
+                                <i class="bi bi-eye"></i> Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function extractPincodeFromAddress(address) {
+        if (!address) return null;
+
+        const lastDashIndex = address.lastIndexOf('-');
+        if (lastDashIndex === -1) return null;
+
+        const afterDash = address.substring(lastDashIndex + 1).trim();
+
+        if (/^[0-9]{6}$/.test(afterDash)) {
+            return afterDash;
+        }
+
+        return null;
+    }
+
+    function renderRouteOnMap() {
+        markers.forEach(marker => marker.setMap(null));
+        markers = [];
+
+        if (!routeData || currentOrders.length === 0) {
+            showNoRouteMessage();
+            return;
+        }
+
+        const ordersWithCoords = currentOrders.filter(o => o.latitude && o.longitude);
+
+        if (ordersWithCoords.length === 0) {
+            showNoRouteMessage();
+            return;
+        }
+
+        const sortedOrders = [...ordersWithCoords].sort((a, b) =>
+            (a.routeOrder || 0) - (b.routeOrder || 0)
+        );
+
+        if (routeData.startLatitude && routeData.startLongitude) {
+            const startMarker = new google.maps.Marker({
+                position: { lat: routeData.startLatitude, lng: routeData.startLongitude },
+                map: map,
+                icon: {
+                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                },
+                title: 'Start Location',
+                label: {
+                    text: 'S',
+                    color: 'white',
+                    fontWeight: 'bold'
+                }
+            });
+            markers.push(startMarker);
+        }
+
+        sortedOrders.forEach((order, index) => {
+            const marker = new google.maps.Marker({
+                position: { lat: order.latitude, lng: order.longitude },
+                map: map,
+                title: `Order ${index + 1}: ${order.orderNo}`,
+                label: {
+                    text: String(index + 1),
+                    color: 'white',
+                    fontWeight: 'bold'
+                }
+            });
+
+            const infoWindow = new google.maps.InfoWindow({
+                content: `
+                    <div class="p-2" style="max-width: 250px;">
+                        <h4 class="font-bold text-gray-800 mb-1">${order.orderNo || 'Order #' + order.id}</h4>
+                        <p class="text-sm text-gray-600 mb-1"><strong>Customer:</strong> ${order.customerName}</p>
+                        <p class="text-sm text-gray-600 mb-1"><strong>Phone:</strong> ${order.customerMobile}</p>
+                        <p class="text-sm text-gray-600 mb-1"><strong>Address:</strong> ${order.address}</p>
+                        <p class="text-sm text-gray-600"><strong>Status:</strong> ${order.assignmentStatus}</p>
+                    </div>
+                `
+            });
+
+            marker.addListener('click', () => {
+                infoWindow.open(map, marker);
+            });
+
+            markers.push(marker);
+        });
+
+        if (sortedOrders.length > 0 && routeData.startLatitude && routeData.startLongitude) {
+            drawOptimizedRoute(
+                { lat: routeData.startLatitude, lng: routeData.startLongitude },
+                sortedOrders
+            );
+        } else {
+            const bounds = new google.maps.LatLngBounds();
+            markers.forEach(marker => bounds.extend(marker.getPosition()));
+            map.fitBounds(bounds);
+        }
+    }
+
+    function drawOptimizedRoute(start, orders) {
+        const waypoints = orders.map(order => ({
+            location: new google.maps.LatLng(order.latitude, order.longitude),
+            stopover: true
+        }));
+
+        const request = {
+            origin: start,
+            destination: start,
+            waypoints: waypoints,
+            optimizeWaypoints: false,
+            travelMode: google.maps.TravelMode.DRIVING
+        };
+
+        directionsService.route(request, (result, status) => {
+            if (status === 'OK') {
+                directionsRenderer.setDirections(result);
+            } else {
+                console.error('Directions request failed:', status);
+                const bounds = new google.maps.LatLngBounds();
+                markers.forEach(marker => bounds.extend(marker.getPosition()));
+                map.fitBounds(bounds);
+            }
+        });
+    }
+
+    function showNoRouteMessage() {
+        document.getElementById('routeSummary').classList.add('hidden');
+
+        map.setCenter({ lat: 12.9716, lng: 77.5946 });
+        map.setZoom(12);
+
+        const infoWindow = new google.maps.InfoWindow({
+            content: '<div class="p-2"><p class="text-gray-600">No route available for this date</p></div>',
+            position: map.getCenter()
+        });
+        infoWindow.open(map);
+
+        document.getElementById('ordersContainer').innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="bi bi-inbox text-3xl"></i>
+                <p class="mt-2">No orders assigned for this date</p>
+            </div>
+        `;
+    }
+
+    function refreshRoute() {
+        loadRouteForDate();
+    }
+
+    function openInGoogleMaps() {
+        if (!routeData || currentOrders.length === 0) {
+            alert('No route available');
+            return;
+        }
+
+        const ordersWithCoords = currentOrders.filter(o => o.latitude && o.longitude);
+
+        if (ordersWithCoords.length === 0) {
+            alert('No valid locations in route');
+            return;
+        }
+
+        const origin = `${routeData.startLatitude},${routeData.startLongitude}`;
+        const waypoints = ordersWithCoords
+            .map(o => `${o.latitude},${o.longitude}`)
+            .join('|');
+
+        const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${origin}&waypoints=${waypoints}&travelmode=driving`;
+        window.open(url, '_blank');
+    }
+
+    function navigateToOrder(lat, lng) {
+        if (!lat || !lng) {
+            alert('Location not available');
+            return;
+        }
+
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+        window.open(url, '_blank');
+    }
+
+    function viewOrderDetails(orderId) {
+        alert('View order details: ' + orderId);
+    }
+
+    function getStatusBorderColor(status) {
+        switch(status) {
+            case 'ASSIGNED': return 'border-orange-500';
+            case 'IN_PROGRESS': return 'border-blue-500';
+            case 'COMPLETED': return 'border-green-500';
+            default: return 'border-gray-500';
+        }
+    }
+
+    function getStatusBadgeClass(status) {
+        switch(status) {
+            case 'ASSIGNED': return 'bg-orange-100 text-orange-800';
+            case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800';
+            case 'COMPLETED': return 'bg-green-100 text-green-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    }
+
+    function formatDateDisplay(dateString) {
+        const date = new Date(dateString);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+
+        if (date.getTime() === today.getTime()) {
+            return 'Today';
+        }
+
+        return date.toLocaleDateString('en-IN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function showMessage(message) {
+        alert(message);
+    }
+    /*]]>*/
+</script>
+
+</body>
+</html>

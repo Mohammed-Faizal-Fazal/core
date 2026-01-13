@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head :: common-head('Items')"></head>
+
+<!-- SweetAlert2 CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+<body class="bg-gray-50">
+<div th:replace="fragments/navigation :: navbar"></div>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-6">
+        <h2 class="text-3xl font-bold text-gray-800">
+            <i class="bi bi-box"></i> Items Master
+        </h2>
+        <p class="text-gray-600">Manage item codes and descriptions</p>
+    </div>
+    <div id="react-root"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="itemModal" class="modal">
+    <div class="modal-content">
+        <div class="gradient-bg text-white p-6 rounded-t-xl">
+            <h3 class="text-2xl font-bold" id="modalTitle">
+                <i class="bi bi-plus-circle"></i> Add Item
+            </h3>
+        </div>
+        <div class="p-6">
+            <form id="itemForm">
+                <input type="hidden" id="itemId">
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item Code *</label>
+                    <input type="text" id="itemCode" maxlength="20"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 uppercase"
+                           placeholder="e.g., SOFA01" required>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Item Description *</label>
+                    <input type="text" id="itemDesc" maxlength="200"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                           placeholder="e.g., 3 Seater Sofa" required>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button type="submit"
+                            class="flex-1 gradient-bg text-white py-3 rounded-lg hover:opacity-90 transition font-semibold">
+                        <i class="bi bi-save"></i> Save
+                    </button>
+                    <button type="button" onclick="closeModal()"
+                            class="flex-1 bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition font-semibold">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- React + Babel + Axios -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- JSX -->
+<script th:inline="none">
+    const ITEMS_JSX = `
+      const { useState, useEffect } = React;
+
+      const csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+      axios.defaults.headers.common[csrfHeader] = csrfToken;
+
+      function toastSuccess(msg){
+        Swal.fire({ icon:'success', title:'Success', text: msg, timer:1600, showConfirmButton:false });
+      }
+      function toastError(msg){
+        Swal.fire({ icon:'error', title:'Error', text: msg });
+      }
+      function showLoading(title='Please wait...'){
+        Swal.fire({ title, allowOutsideClick:false, didOpen: () => Swal.showLoading() });
+      }
+
+      function ItemsManager() {
+        const [items, setItems] = useState([]);
+        const [loading, setLoading] = useState(false);
+        const [filter, setFilter] = useState('all');
+
+        useEffect(() => { fetchItems(); }, []);
+
+        const fetchItems = async () => {
+          setLoading(true);
+          try {
+            const res = await axios.get('/api/master/items');
+            setItems(res.data);
+          } catch (e) {
+            toastError('Failed to fetch items');
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const openAddModal = () => {
+          itemId.value='';
+          itemCode.value='';
+          itemDesc.value='';
+          itemCode.disabled=false;
+          modalTitle.innerHTML='<i class="bi bi-plus-circle"></i> Add Item';
+          itemModal.classList.add('show');
+        };
+
+        const openEditModal = (item) => {
+          itemId.value=item.id;
+          itemCode.value=item.itemCode;
+          itemDesc.value=item.itemDesc;
+          itemCode.disabled=true;
+          modalTitle.innerHTML='<i class="bi bi-pencil-square"></i> Edit Item';
+          itemModal.classList.add('show');
+        };
+
+        const toggleActive = async (id) => {
+          const r = await Swal.fire({
+            icon:'question',
+            title:'Toggle Status?',
+            showCancelButton:true,
+            confirmButtonText:'Yes'
+          });
+          if(!r.isConfirmed) return;
+
+          try {
+            showLoading('Updating...');
+            const res = await axios.post(\`/api/master/items/\${id}/toggle-active\`);
+            Swal.close();
+            if(res.data.success){ toastSuccess(res.data.message); fetchItems(); }
+            else toastError(res.data.message);
+          } catch {
+            Swal.close(); toastError('Failed to toggle status');
+          }
+        };
+
+        const deleteItem = async (id) => {
+          const r = await Swal.fire({
+            icon:'warning',
+            title:'Delete Item?',
+            text:'This cannot be undone',
+            showCancelButton:true,
+            confirmButtonColor:'#d33',
+            confirmButtonText:'Delete'
+          });
+          if(!r.isConfirmed) return;
+
+          try {
+            showLoading('Deleting...');
+            const res = await axios.delete(\`/api/master/items/\${id}\`);
+            Swal.close();
+            if(res.data.success){ toastSuccess(res.data.message); fetchItems(); }
+            else toastError(res.data.message);
+          } catch {
+            Swal.close(); toastError('Failed to delete item');
+          }
+        };
+
+        const handleExcelUpload = async (e) => {
+          const file = e.target.files[0];
+          if(!file) return;
+          const fd = new FormData();
+          fd.append('file', file);
+
+          try {
+            showLoading('Uploading...');
+            const res = await axios.post('/api/master/items/upload', fd);
+            Swal.close();
+            if(res.data.success){ toastSuccess(res.data.message); fetchItems(); }
+            else toastError(res.data.message);
+          } catch {
+            Swal.close(); toastError('Upload failed');
+          } finally { e.target.value=''; }
+        };
+
+        const filtered = items.filter(i =>
+          filter==='all' || (filter==='active' ? i.active : !i.active)
+        );
+
+        window.openAddModal=openAddModal;
+        window.openEditModal=openEditModal;
+        window.toggleActive=toggleActive;
+        window.deleteItem=deleteItem;
+
+        if(loading){
+          return <div className="text-center py-12">
+            <div className="inline-block animate-spin h-16 w-16 border-4 border-green-500 border-t-transparent rounded-full"></div>
+          </div>
+        }
+
+        return (
+          <div>
+            <div className="bg-white p-6 rounded-xl shadow mb-6 flex flex-wrap justify-between gap-4">
+              <div className="flex gap-2">
+                <button className="gradient-bg text-white px-4 py-2 rounded-lg" onClick={openAddModal}>
+                  <i className="bi bi-plus-circle"></i> Add Item
+                </button>
+                <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer">
+                  <i className="bi bi-upload"></i> Upload
+                  <input type="file" className="hidden" onChange={handleExcelUpload}/>
+                </label>
+              </div>
+
+              <select className="border px-3 py-2 rounded-lg"
+                      value={filter} onChange={e=>setFilter(e.target.value)}>
+                <option value="all">All ({items.length})</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div className="bg-white rounded-xl shadow overflow-x-auto">
+              <table className="w-full">
+                <thead className="gradient-bg text-white">
+                  <tr>
+                    <th className="px-4 py-3">#</th>
+                    <th className="px-4 py-3">Item Code</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((i,idx)=>(
+                    <tr key={i.id} className="border-t">
+                      <td className="px-4 py-2">{idx+1}</td>
+                      <td className="px-4 py-2 font-bold text-green-600">{i.itemCode}</td>
+                      <td className="px-4 py-2">{i.itemDesc}</td>
+                      <td className="px-4 py-2">
+                        <span className={\`px-2 py-1 text-xs rounded \${i.active?'bg-green-100':'bg-red-100'}\`}>
+                          {i.active?'Active':'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 flex gap-2">
+                        <button className="bg-blue-600 text-white px-2 rounded" onClick={()=>openEditModal(i)}>
+                          <i className="bi bi-pencil"></i>
+                        </button>
+                        <button className="bg-orange-600 text-white px-2 rounded" onClick={()=>toggleActive(i.id)}>
+                          <i className="bi bi-toggle-on"></i>
+                        </button>
+                        <button className="bg-red-600 text-white px-2 rounded" onClick={()=>deleteItem(i.id)}>
+                          <i className="bi bi-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('react-root')).render(<ItemsManager/>);
+    `;
+    (function(){
+      const compiled = Babel.transform(ITEMS_JSX,{presets:['react']}).code;
+      new Function(compiled)();
+    })();
+</script>
+
+<script>
+    function closeModal(){
+      document.getElementById('itemModal').classList.remove('show');
+    }
+    window.onclick = e => { if(e.target===itemModal) closeModal(); }
+
+    document.getElementById('itemForm').addEventListener('submit', async e=>{
+      e.preventDefault();
+      const id=itemId.value;
+      const data={ itemCode:itemCode.value.toUpperCase(), itemDesc:itemDesc.value, active:true };
+
+      try{
+        Swal.fire({title:'Saving...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        const res=id?await axios.put(`/api/master/items/${id}`,data)
+                      :await axios.post('/api/master/items',data);
+        Swal.close();
+        if(res.data.success){
+          Swal.fire({icon:'success',title:'Saved!',timer:1500,showConfirmButton:false});
+          closeModal();
+          setTimeout(()=>location.reload(),800);
+        } else Swal.fire({icon:'error',title:'Failed',text:res.data.message});
+      }catch{
+        Swal.close();
+        Swal.fire({icon:'error',title:'Failed',text:'Error saving item'});
+      }
+    });
+</script>
+</body>
+</html>
