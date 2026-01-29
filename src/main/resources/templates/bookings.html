@@ -36,16 +36,6 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                        <input type="date" id="editDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                        <input type="time" id="editTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
                         <input type="text" id="editEmployeeName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
@@ -53,6 +43,30 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">Employee Phone</label>
                         <input type="text" id="editEmployeePhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                     </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                        <select id="editServiceName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select id="editStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                            <!-- Options will be populated dynamically by JavaScript -->
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Service Types</label>
+                    <div id="editServiceTypes" class="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                        <!-- Checkboxes will be populated dynamically -->
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Amount (₹)</label>
+                    <input type="number" id="editAmount" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                 </div>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
@@ -136,6 +150,9 @@
       const [filteredBookings, setFilteredBookings] = useState([]);
       const [loading, setLoading] = useState(false);
       const [expandedRows, setExpandedRows] = useState(new Set());
+      const [availableStatuses, setAvailableStatuses] = useState([]);
+      const [availableServiceNames, setAvailableServiceNames] = useState([]);
+      const [availableServiceTypes, setAvailableServiceTypes] = useState([]);
       const [filters, setFilters] = useState({
         status: '', customerName: '', orderNo: '', serviceName: '', dateFrom: '', dateTo: ''
       });
@@ -155,6 +172,23 @@
             setBookings(nonSubmitted);
             setFilteredBookings(nonSubmitted);
             saveCache(nonSubmitted);
+
+            // Extract unique statuses
+            const statuses = [...new Set(nonSubmitted.map(b => b.status))].filter(Boolean);
+            setAvailableStatuses(statuses);
+
+            // Extract unique service names
+            const serviceNames = [...new Set(nonSubmitted.map(b => b.serviceName))].filter(Boolean);
+            setAvailableServiceNames(serviceNames);
+
+            // Extract unique service types
+            const allServiceTypes = new Set();
+            nonSubmitted.forEach(b => {
+              const types = parseServiceTypes(b.serviceTypes);
+              types.forEach(type => allServiceTypes.add(type));
+            });
+            setAvailableServiceTypes([...allServiceTypes].filter(Boolean));
+
             toast('success', 'Bookings loaded');
             return;
           }
@@ -163,10 +197,30 @@
           if (cached.length > 0) {
             setBookings(cached);
             setFilteredBookings(cached);
+
+            // Extract unique statuses from cache
+            const statuses = [...new Set(cached.map(b => b.status))].filter(Boolean);
+            setAvailableStatuses(statuses);
+
+            // Extract unique service names from cache
+            const serviceNames = [...new Set(cached.map(b => b.serviceName))].filter(Boolean);
+            setAvailableServiceNames(serviceNames);
+
+            // Extract unique service types from cache
+            const allServiceTypes = new Set();
+            cached.forEach(b => {
+              const types = parseServiceTypes(b.serviceTypes);
+              types.forEach(type => allServiceTypes.add(type));
+            });
+            setAvailableServiceTypes([...allServiceTypes].filter(Boolean));
+
             toast('info', 'No new bookings. Showing saved data');
           } else {
             setBookings([]);
             setFilteredBookings([]);
+            setAvailableStatuses([]);
+            setAvailableServiceNames([]);
+            setAvailableServiceTypes([]);
             Swal.fire({
               icon: 'warning',
               title: 'No bookings found',
@@ -181,6 +235,23 @@
           if (cached.length > 0) {
             setBookings(cached);
             setFilteredBookings(cached);
+
+            // Extract unique statuses from cache
+            const statuses = [...new Set(cached.map(b => b.status))].filter(Boolean);
+            setAvailableStatuses(statuses);
+
+            // Extract unique service names from cache
+            const serviceNames = [...new Set(cached.map(b => b.serviceName))].filter(Boolean);
+            setAvailableServiceNames(serviceNames);
+
+            // Extract unique service types from cache
+            const allServiceTypes = new Set();
+            cached.forEach(b => {
+              const types = parseServiceTypes(b.serviceTypes);
+              types.forEach(type => allServiceTypes.add(type));
+            });
+            setAvailableServiceTypes([...allServiceTypes].filter(Boolean));
+
             Swal.fire({
               icon: 'error',
               title: 'Fetch failed',
@@ -190,6 +261,9 @@
           } else {
             setBookings([]);
             setFilteredBookings([]);
+            setAvailableStatuses([]);
+            setAvailableServiceNames([]);
+            setAvailableServiceTypes([]);
             Swal.fire({
               icon: 'error',
               title: 'Fetch failed',
@@ -220,12 +294,65 @@
         document.getElementById('editBookingId').value = booking.id;
         document.getElementById('editCustomerName').value = booking.customerName || '';
         document.getElementById('editCustomerMobile').value = booking.customerMobile || '';
-        document.getElementById('editDate').value = booking.date || '';
-        document.getElementById('editTime').value = booking.bookingTime || '';
         document.getElementById('editEmployeeName').value = booking.employeeName || '';
         document.getElementById('editEmployeePhone').value = booking.employeePhone || '';
+        document.getElementById('editAmount').value = booking.totalPrice || '';
         document.getElementById('editAddress').value = booking.address || '';
         document.getElementById('editNotes').value = booking.notes || '';
+
+        // Dynamically populate status dropdown
+        const statusSelect = document.getElementById('editStatus');
+        statusSelect.innerHTML = '';
+
+        availableStatuses.forEach(status => {
+          const option = document.createElement('option');
+          option.value = status;
+          option.textContent = status;
+          if (status === booking.status) {
+            option.selected = true;
+          }
+          statusSelect.appendChild(option);
+        });
+
+        // Dynamically populate service name dropdown
+        const serviceNameSelect = document.getElementById('editServiceName');
+        serviceNameSelect.innerHTML = '';
+
+        availableServiceNames.forEach(serviceName => {
+          const option = document.createElement('option');
+          option.value = serviceName;
+          option.textContent = serviceName;
+          if (serviceName === booking.serviceName) {
+            option.selected = true;
+          }
+          serviceNameSelect.appendChild(option);
+        });
+
+        // Dynamically populate service types checkboxes
+        const serviceTypesContainer = document.getElementById('editServiceTypes');
+        serviceTypesContainer.innerHTML = '';
+
+        const currentServiceTypes = parseServiceTypes(booking.serviceTypes);
+
+        availableServiceTypes.forEach(serviceType => {
+          const label = document.createElement('label');
+          label.className = 'flex items-center space-x-2 cursor-pointer';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = serviceType;
+          checkbox.className = 'form-checkbox h-4 w-4 text-green-600 rounded focus:ring-green-500';
+          checkbox.checked = currentServiceTypes.includes(serviceType);
+
+          const span = document.createElement('span');
+          span.textContent = serviceType;
+          span.className = 'text-sm text-gray-700';
+
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          serviceTypesContainer.appendChild(label);
+        });
+
         document.getElementById('editModal').classList.add('show');
       };
 
@@ -378,10 +505,9 @@
                   onChange={(e) => handleFilterChange('status', e.target.value)}
                 >
                   <option value="">All</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Work Done">Work Done</option>
+                  {availableStatuses.map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
                 </select>
               </div>
 
@@ -570,12 +696,6 @@
                                     <i className="bi bi-clock-history"></i> Timeline
                                   </h6>
                                   <p className="mb-2"><strong>Created:</strong> {new Date(booking.createdAt).toLocaleString()}</p>
-                                  {booking.employeeName && (
-                                    <p className="mb-0">
-                                      <strong>Assigned To:</strong> {booking.employeeName}<br/>
-                                      <span className="text-gray-600">({booking.employeePhone})</span>
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             </td>
@@ -623,13 +743,20 @@
         e.preventDefault();
 
         const bookingId = document.getElementById('editBookingId').value;
+
+        // Get selected service types from checkboxes
+        const serviceTypesCheckboxes = document.querySelectorAll('#editServiceTypes input[type="checkbox"]:checked');
+        const selectedServiceTypes = Array.from(serviceTypesCheckboxes).map(cb => cb.value);
+
         const updatedData = {
             customerName: document.getElementById('editCustomerName').value,
             customerMobile: document.getElementById('editCustomerMobile').value,
-            date: document.getElementById('editDate').value,
-            bookingTime: document.getElementById('editTime').value,
             employeeName: document.getElementById('editEmployeeName').value,
             employeePhone: document.getElementById('editEmployeePhone').value,
+            serviceName: document.getElementById('editServiceName').value,
+            serviceTypes: JSON.stringify(selectedServiceTypes),
+            status: document.getElementById('editStatus').value,
+            totalPrice: parseFloat(document.getElementById('editAmount').value),
             address: document.getElementById('editAddress').value,
             notes: document.getElementById('editNotes').value
         };

@@ -18,7 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/carpenters")
-@PreAuthorize("hasRole('OPERATION')")
+
 public class CarpenterApiController {
 
     private static final Logger logger = LoggerFactory.getLogger(CarpenterApiController.class);
@@ -130,7 +130,7 @@ public class CarpenterApiController {
     }
 
     @GetMapping("/current")
-    @PreAuthorize("hasRole('CARPENTER')")
+
     public ResponseEntity<Carpenter> getCurrentCarpenter(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         Carpenter carpenter = carpenterService.getCarpenterByMobile(user.getPhoneNumber());

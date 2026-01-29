@@ -1,70 +1,98 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:fragment="common-head(title)">
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${title} + ' - INSTAFITCORE'">INSTAFITCORE</title>
 
-    <!-- CSRF Token -->
+    <!-- CSRF -->
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind (Dev) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Axios -->
+    <!-- Axios (keep only ONE axios in whole project) -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <!-- ✅ SweetAlert2 (GLOBAL for all pages) -->
+    <!-- SweetAlert2 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <!-- Common Styles -->
+    <!-- Global Helpers -->
+    <script>
+        // Auto-configure axios CSRF header on page load
+        window.addEventListener('load', () => {
+            const csrfTokenMeta = document.querySelector('meta[name="_csrf"]');
+            const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+            if (csrfTokenMeta && csrfHeaderMeta && window.axios) {
+                axios.defaults.headers.common[csrfHeaderMeta.content] = csrfTokenMeta.content;
+            }
+        });
+
+        // Basic alerts
+        function showSuccess(message, title = 'Success') {
+            Swal.fire({ icon: 'success', title, text: message, timer: 2000, showConfirmButton: false });
+        }
+
+        function showError(message, title = 'Error') {
+            Swal.fire({ icon: 'error', title, text: message });
+        }
+
+        function showWarning(message, title = 'Warning') {
+            Swal.fire({ icon: 'warning', title, text: message });
+        }
+
+        function showInfo(message, title = 'Info') {
+            Swal.fire({ icon: 'info', title, text: message });
+        }
+
+        // Toast (top-right small popup)
+        function showToast(message, type = 'success') {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: type,
+                title: message,
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true
+            });
+        }
+
+        // Loading modal
+        function showLoading(message = 'Loading...', title = 'Please wait') {
+            Swal.fire({
+                title: title,
+                html: message,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => Swal.showLoading()
+            });
+        }
+
+        function closeLoading() {
+            Swal.close();
+        }
+
+        // Optional generic dispatcher (if any page calls showMessage(type, msg))
+        function showMessage(type, message, title) {
+            if (type === 'success') return showSuccess(message, title || 'Success');
+            if (type === 'error')   return showError(message, title || 'Error');
+            if (type === 'warning') return showWarning(message, title || 'Warning');
+            return showInfo(message, title || 'Info');
+        }
+    </script>
+
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #8BC34A 0%, #689F38 100%);
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 0;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
     </style>
+
 </head>
 </html>

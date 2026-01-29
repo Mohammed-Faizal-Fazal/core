@@ -4,10 +4,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.net.ssl.*;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.*;
 
 @Service
@@ -18,7 +23,38 @@ public class GoogleMapsService {
     @Value("${google.maps.api.key:}")
     private String apiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate createTrustAllRestTemplate() {
+        try {
+            // Create a trust manager that accepts all certificates
+            TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return null;
+                        }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                        }
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                        }
+                    }
+            };
+
+            // Install the all-trusting trust manager
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+
+            // Create an ssl socket factory with our all-trusting manager
+            SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            // Configure HttpsURLConnection to use this
+            HttpsURLConnection.setDefaultSSLSocketFactory(sslSocketFactory);
+            HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+
+            return new RestTemplate();
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            logger.error("Failed to create SSL trust-all context", e);
+            return new RestTemplate();
+        }
+    }
 
     /**
      * Geocode an address to get latitude and longitude
@@ -42,6 +78,8 @@ public class GoogleMapsService {
 
             logger.info("Geocoding address: {}", address);
 
+            // Use the trust-all REST template
+            RestTemplate restTemplate = createTrustAllRestTemplate();
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             Map<String, Object> responseBody = response.getBody();
 
@@ -128,6 +166,8 @@ public class GoogleMapsService {
 
             logger.info("Optimizing route with {} waypoints", waypoints.size());
 
+            // Use the trust-all REST template
+            RestTemplate restTemplate = createTrustAllRestTemplate();
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             Map<String, Object> responseBody = response.getBody();
 

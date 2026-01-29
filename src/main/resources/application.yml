@@ -101,7 +101,7 @@ management:
 google:
   maps:
     api:
-      key:
+      key: AIzaSyDW6Rijt0WIddf-mB0BXqSdI8iQGPTr-_Y
 app:
   upload:
     dir: uploads/job-images/

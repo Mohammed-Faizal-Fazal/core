@@ -46,6 +46,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return super.authenticationManagerBean();
     }
 
+
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
@@ -53,7 +54,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/", "/login**", "/register**", "/api/auth/**",
                         "/api/master/cities/active",
                         "/api/master/branches/active",
-                        "/api/master/fit-types/active").permitAll()  // ← ADD THIS
+                        "/api/master/fit-types/active").permitAll()
+                // CARPENTER-specific endpoints MUST come BEFORE general /api/carpenters/**
+                .antMatchers("/api/carpenters/current").hasAnyRole("CARPENTER", "OPERATION")
+                .antMatchers("/api/carpenter-jobs/**").hasRole("CARPENTER")
+                .antMatchers("/api/carpenter-assignment/route/**").hasAnyRole("CARPENTER", "OPERATION")
+                .antMatchers("/api/carpenters/dashboard/**").hasRole("CARPENTER")
+                // General patterns
                 .antMatchers("/carpenter/**").hasRole("CARPENTER")
                 .antMatchers("/home", "/bookings/**", "/master/**", "/submitted-orders", "/api/carpenters/**", "/api/master/**").hasRole("OPERATION")
                 .antMatchers("/job-monitoring", "/api/job-monitoring/**").hasRole("OPERATION")

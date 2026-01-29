@@ -12,10 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * API Controller
- * REST API endpoints for user information and health checks
- */
+
 @RestController
 @RequestMapping("/api")
 public class ApiController {
@@ -23,9 +20,7 @@ public class ApiController {
     @Autowired
     private UserService userService;
 
-    /**
-     * Get current user information
-     */
+
     @GetMapping("/user/info")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getUserInfo(Authentication authentication) {
@@ -48,14 +43,12 @@ public class ApiController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
-    /**
-     * Health check endpoint (public)
-     */
+
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
         Map<String, String> response = new HashMap<>();
         response.put("status", "UP");
-        response.put("message", "INSTAFITCORE Application is running");
+        response.put("message", "App is running");
         response.put("timestamp", String.valueOf(System.currentTimeMillis()));
         return ResponseEntity.ok(response);
     }

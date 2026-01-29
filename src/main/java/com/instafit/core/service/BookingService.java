@@ -259,18 +259,7 @@ public class BookingService {
             booking.setAddress(updatedBooking.getAddress());
         }
 
-        if (updatedBooking.getDate() != null &&
-                !updatedBooking.getDate().equals(booking.getDate())) {
-            changes.put("date", booking.getDate() + " → " + updatedBooking.getDate());
-            booking.setDate(updatedBooking.getDate());
-        }
-
-        if (updatedBooking.getBookingTime() != null &&
-                !updatedBooking.getBookingTime().equals(booking.getBookingTime())) {
-            changes.put("bookingTime", booking.getBookingTime() + " → " + updatedBooking.getBookingTime());
-            booking.setBookingTime(updatedBooking.getBookingTime());
-        }
-
+        // Employee Name update
         if (updatedBooking.getEmployeeName() != null &&
                 !updatedBooking.getEmployeeName().equals(booking.getEmployeeName())) {
             changes.put("employeeName",
@@ -279,12 +268,47 @@ public class BookingService {
             booking.setEmployeeName(updatedBooking.getEmployeeName());
         }
 
+        // Employee Phone update
         if (updatedBooking.getEmployeePhone() != null &&
                 !updatedBooking.getEmployeePhone().equals(booking.getEmployeePhone())) {
             changes.put("employeePhone",
                     (booking.getEmployeePhone() != null ? booking.getEmployeePhone() : "None") +
                             " → " + updatedBooking.getEmployeePhone());
             booking.setEmployeePhone(updatedBooking.getEmployeePhone());
+        }
+
+        // Service Name update
+        if (updatedBooking.getServiceName() != null &&
+                !updatedBooking.getServiceName().equals(booking.getServiceName())) {
+            changes.put("serviceName",
+                    (booking.getServiceName() != null ? booking.getServiceName() : "None") +
+                            " → " + updatedBooking.getServiceName());
+            booking.setServiceName(updatedBooking.getServiceName());
+        }
+
+        // Service Types update
+        if (updatedBooking.getServiceTypes() != null &&
+                !updatedBooking.getServiceTypes().equals(booking.getServiceTypes())) {
+            changes.put("serviceTypes", "Service types updated");
+            booking.setServiceTypes(updatedBooking.getServiceTypes());
+        }
+
+        // Status update
+        if (updatedBooking.getStatus() != null &&
+                !updatedBooking.getStatus().equals(booking.getStatus())) {
+            changes.put("status",
+                    (booking.getStatus() != null ? booking.getStatus() : "None") +
+                            " → " + updatedBooking.getStatus());
+            booking.setStatus(updatedBooking.getStatus());
+        }
+
+        // Total Price update
+        if (updatedBooking.getTotalPrice() != null &&
+                !updatedBooking.getTotalPrice().equals(booking.getTotalPrice())) {
+            changes.put("totalPrice",
+                    (booking.getTotalPrice() != null ? "₹" + booking.getTotalPrice() : "₹0") +
+                            " → ₹" + updatedBooking.getTotalPrice());
+            booking.setTotalPrice(updatedBooking.getTotalPrice());
         }
 
         if (updatedBooking.getNotes() != null) {
@@ -307,6 +331,7 @@ public class BookingService {
 
         return saved;
     }
+
 
 
     public Booking submitBooking(Long bookingId, String username) {

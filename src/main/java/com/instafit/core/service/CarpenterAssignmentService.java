@@ -180,9 +180,33 @@ public class CarpenterAssignmentService {
                 return result;
             }
 
+            // Separate geocoded and failed bookings
             List<Booking> geocodedBookings = bookings.stream()
                     .filter(b -> b.getLatitude() != null && b.getLongitude() != null)
                     .collect(Collectors.toList());
+
+            List<Booking> failedBookings = bookings.stream()
+                    .filter(b -> b.getLatitude() == null || b.getLongitude() == null)
+                    .collect(Collectors.toList());
+
+            // If there are failed geocodes, return them for fixing
+            if (!failedBookings.isEmpty()) {
+                List<Map<String, Object>> failedBookingsList = failedBookings.stream()
+                        .map(b -> {
+                            Map<String, Object> failedInfo = new HashMap<>();
+                            failedInfo.put("id", b.getId());
+                            failedInfo.put("orderNo", b.getOrderNo());
+                            failedInfo.put("address", b.getAddress());
+                            failedInfo.put("customerName", b.getCustomerName());
+                            return failedInfo;
+                        })
+                        .collect(Collectors.toList());
+
+                result.put("success", false);
+                result.put("message", failedBookings.size() + " order(s) failed geocoding. Please fix the locations.");
+                result.put("failedBookings", failedBookingsList);
+                return result;
+            }
 
             if (geocodedBookings.isEmpty()) {
                 result.put("success", false);
@@ -209,6 +233,42 @@ public class CarpenterAssignmentService {
                         return wp;
                     })
                     .collect(Collectors.toList());
+
+            // Special handling for single order - no need to optimize
+            if (geocodedBookings.size() == 1) {
+                Booking singleBooking = geocodedBookings.get(0);
+                singleBooking.setRouteOrder(1);
+                bookingRepository.save(singleBooking);
+
+                // Calculate simple distance for single order
+                double distance = calculateDistance(startLat, startLng,
+                        singleBooking.getLatitude(), singleBooking.getLongitude());
+
+                OrderRoute orderRoute = orderRouteRepository
+                        .findByCarpenterIdAndRouteDate(carpenterId, routeDate)
+                        .orElse(new OrderRoute());
+
+                orderRoute.setCarpenterId(carpenterId);
+                orderRoute.setRouteDate(routeDate);
+                orderRoute.setStartLocation(startPincode);
+                orderRoute.setStartLatitude(startLat);
+                orderRoute.setStartLongitude(startLng);
+                orderRoute.setTotalDistance(distance);
+                orderRoute.setTotalDuration((int)(distance * 2)); // Rough estimate: 2 min per km
+                orderRoute.setOrderSequence("[0]");
+                orderRoute.setCreatedBy(username);
+                orderRoute.setActive(true);
+
+                orderRouteRepository.save(orderRoute);
+
+                result.put("success", true);
+                result.put("message", "Single order assigned successfully");
+                result.put("totalDistance", String.format("%.2f km", distance));
+                result.put("totalDuration", (int)(distance * 2) + " minutes (estimated)");
+                result.put("ordersInRoute", 1);
+
+                return result;
+            }
 
             Map<String, Object> routeResult = googleMapsService.getOptimizedRoute(startLat, startLng, waypoints);
 
@@ -408,5 +468,111 @@ public class CarpenterAssignmentService {
         }
 
         return "Unknown";
+    }
+
+    /**
+     * Update booking address and retry geocoding
+     */
+    @Transactional
+    public Map<String, Object> updateAddressAndGeocode(Long bookingId, String newAddress, String username) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+            logger.info("Updating address for booking {}: {} -> {}", bookingId, booking.getAddress(), newAddress);
+
+            // Update address
+            booking.setAddress(newAddress);
+
+            // Try to geocode the new address
+            Map<String, Object> geocodeResult = googleMapsService.geocodeAddress(newAddress);
+
+            if ((Boolean) geocodeResult.get("success")) {
+                booking.setLatitude((Double) geocodeResult.get("latitude"));
+                booking.setLongitude((Double) geocodeResult.get("longitude"));
+                booking.setGeocodeStatus("SUCCESS");
+
+                logger.info("Successfully geocoded new address for booking {}: {}, {}",
+                        bookingId, booking.getLatitude(), booking.getLongitude());
+
+                result.put("success", true);
+                result.put("message", "Address updated and geocoded successfully");
+                result.put("latitude", booking.getLatitude());
+                result.put("longitude", booking.getLongitude());
+            } else {
+                booking.setGeocodeStatus("FAILED");
+
+                logger.warn("Failed to geocode new address for booking {}: {}",
+                        bookingId, geocodeResult.get("message"));
+
+                result.put("success", false);
+                result.put("message", "Address updated but geocoding failed: " + geocodeResult.get("message"));
+            }
+
+            bookingRepository.save(booking);
+
+        } catch (Exception e) {
+            logger.error("Error updating address for booking " + bookingId, e);
+            result.put("success", false);
+            result.put("message", "Error: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * Update booking coordinates directly from map selection
+     */
+    @Transactional
+    public Map<String, Object> updateCoordinatesDirectly(Long bookingId, Double latitude, Double longitude, String username) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+            logger.info("Updating coordinates for booking {} to: {}, {}", bookingId, latitude, longitude);
+
+            // Update coordinates directly
+            booking.setLatitude(latitude);
+            booking.setLongitude(longitude);
+            booking.setGeocodeStatus("MANUAL");
+
+            bookingRepository.save(booking);
+
+            logger.info("Successfully updated coordinates for booking {}", bookingId);
+
+            result.put("success", true);
+            result.put("message", "Coordinates updated successfully");
+            result.put("latitude", latitude);
+            result.put("longitude", longitude);
+
+        } catch (Exception e) {
+            logger.error("Error updating coordinates for booking " + bookingId, e);
+            result.put("success", false);
+            result.put("message", "Error: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * Calculate distance between two coordinates using Haversine formula
+     * Returns distance in kilometers
+     */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Radius of the earth in km
+
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = R * c;
+
+        return distance;
     }
 }

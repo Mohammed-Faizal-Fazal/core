@@ -60,6 +60,45 @@ public class CarpenterAssignmentApiController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/update-address/{bookingId}")
+    @PreAuthorize("hasRole('OPERATION')")
+    public ResponseEntity<Map<String, Object>> updateAddress(
+            @PathVariable Long bookingId,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+
+        String newAddress = request.get("address");
+        logger.info("Updating address for booking {} to: {}", bookingId, newAddress);
+
+        Map<String, Object> result = carpenterAssignmentService.updateAddressAndGeocode(
+                bookingId,
+                newAddress,
+                authentication.getName()
+        );
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/update-coordinates/{bookingId}")
+    @PreAuthorize("hasRole('OPERATION')")
+    public ResponseEntity<Map<String, Object>> updateCoordinates(
+            @PathVariable Long bookingId,
+            @RequestBody CoordinatesRequest request,
+            Authentication authentication) {
+
+        logger.info("Updating coordinates for booking {} to: {}, {}",
+                bookingId, request.getLatitude(), request.getLongitude());
+
+        Map<String, Object> result = carpenterAssignmentService.updateCoordinatesDirectly(
+                bookingId,
+                request.getLatitude(),
+                request.getLongitude(),
+                authentication.getName()
+        );
+
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/generate-route")
     @PreAuthorize("hasRole('OPERATION')")
     public ResponseEntity<Map<String, Object>> generateRoute(
@@ -147,6 +186,27 @@ public class CarpenterAssignmentApiController {
 
         public void setStartPincode(String startPincode) {
             this.startPincode = startPincode;
+        }
+    }
+
+    public static class CoordinatesRequest {
+        private Double latitude;
+        private Double longitude;
+
+        public Double getLatitude() {
+            return latitude;
+        }
+
+        public void setLatitude(Double latitude) {
+            this.latitude = latitude;
+        }
+
+        public Double getLongitude() {
+            return longitude;
+        }
+
+        public void setLongitude(Double longitude) {
+            this.longitude = longitude;
         }
     }
 }

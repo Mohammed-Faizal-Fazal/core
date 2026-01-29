@@ -39,12 +39,12 @@ public class BookingController {
     /**
      * Submitted orders page
      */
-    @GetMapping("/submitted-orders")
+   /* @GetMapping("/submitted-orders")
     @PreAuthorize("hasRole('OPERATION')")
     public String submittedOrdersPage(Model model) {
         model.addAttribute("activePage", "submitted-orders");
         return "submitted-orders";
-    }
+    }*/
 
     /**
      * API: Fetch bookings from Supabase
